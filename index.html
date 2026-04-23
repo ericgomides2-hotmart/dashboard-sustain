@@ -185,7 +185,7 @@
   }
   .modal-box {
     background: var(--card); border-radius: 12px; padding: 1.5rem;
-    max-width: 710px; width: 90%; max-height: 80vh; overflow-y: auto;
+    max-width: 900px; width: 95%; max-height: 80vh; overflow-y: auto;
     box-shadow: 0 8px 32px rgba(0,0,0,.15);
   }
   .modal-box h3 { font-size: 1rem; margin-bottom: 1rem; }
@@ -372,10 +372,6 @@
 
   <!-- CHARTS ROW 4 -->
   <div class="charts-grid">
-    <div class="chart-card">
-      <div class="chart-title"><span class="icon">💰</span> Segmentação CX (Faturamento)</div>
-      <div class="chart-container"><canvas id="chart-seg"></canvas></div>
-    </div>
     <div class="chart-card">
       <div class="chart-title"><span class="icon">📈</span> Segmentação CX por Período</div>
       <div class="chart-container"><canvas id="chart-seg-time"></canvas></div>
@@ -721,7 +717,6 @@ function renderAll() {
   renderTransbordoChart();
   renderAgingChart();
   renderPUChart();
-  renderSegChart();
   renderSegTimeChart();
   renderProductTable();
 }
