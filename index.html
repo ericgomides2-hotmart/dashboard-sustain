@@ -87,6 +87,26 @@
   .btn-refresh.loading .spinner { display: inline; }
   .btn-refresh.loading .label { display: none; }
 
+  /* Tabs */
+  .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
+  .tab-btn {
+    padding: .6rem 1.5rem; font-size: .85rem; font-weight: 600; border: none;
+    background: none; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent;
+    margin-bottom: -2px; transition: all .2s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* IQP */
+  .iqp-score { font-size: 1.6rem; font-weight: 700; }
+  .iqp-good { color: var(--green); }
+  .iqp-medium { color: var(--yellow); }
+  .iqp-bad { color: var(--red); }
+  .iqp-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .iqp-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+
   /* Layout */
   .main { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
 
@@ -259,6 +279,15 @@
 <!-- MAIN CONTENT -->
 <div class="main" id="main-content" style="display:none;">
 
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('geral')">Geral</button>
+    <button class="tab-btn" onclick="switchTab('iqp')">IQP</button>
+  </div>
+
+  <!-- TAB: GERAL -->
+  <div class="tab-content active" id="tab-geral">
+
   <!-- FILTERS -->
   <div class="filters">
     <div class="filter-group">
@@ -398,6 +427,76 @@
       <tbody id="table-produtos"></tbody>
     </table>
   </div>
+
+  </div><!-- end tab-geral -->
+
+  <!-- TAB: IQP -->
+  <div class="tab-content" id="tab-iqp">
+
+    <!-- IQP FILTERS -->
+    <div class="filters">
+      <div class="filter-group">
+        <label>PU</label>
+        <select id="iqp-filter-pu" onchange="renderIQP()">
+          <option value="all">Todas</option>
+          <option value="Commerce">Commerce</option>
+          <option value="Credit">Credit</option>
+          <option value="Trust">Trust</option>
+          <option value="Sustain">Sustain</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Período</label>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-iqpview="mom" onclick="setIQPView('mom')">Mensal</button>
+          <button class="toggle-btn" data-iqpview="wow" onclick="setIQPView('wow')">Semanal</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>De</label>
+        <input type="month" id="iqp-filter-from" value="2025-01" onchange="renderIQP()">
+      </div>
+      <div class="filter-group">
+        <label>Até</label>
+        <input type="month" id="iqp-filter-to" onchange="renderIQP()">
+      </div>
+    </div>
+
+    <!-- IQP by PU -->
+    <div class="table-card">
+      <div class="chart-title"><span class="icon">🏆</span> IQP por PU</div>
+      <table>
+        <thead>
+          <tr><th>PU</th><th>IQP</th><th></th><th>Tickets</th><th>SLA (mediana dias)</th><th>Criticidade</th></tr>
+        </thead>
+        <tbody id="iqp-table-pu"></tbody>
+      </table>
+    </div>
+
+    <!-- IQP by Produto -->
+    <div class="table-card">
+      <div class="chart-title"><span class="icon">📊</span> IQP por Produto</div>
+      <table>
+        <thead>
+          <tr><th>Produto</th><th>PU</th><th>IQP</th><th></th><th>Tickets</th><th>SLA (mediana dias)</th><th>Criticidade</th></tr>
+        </thead>
+        <tbody id="iqp-table-produto"></tbody>
+      </table>
+    </div>
+
+    <!-- IQP Chart -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title"><span class="icon">📈</span> IQP por Período — PUs</div>
+        <div class="chart-container"><canvas id="chart-iqp-pu"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><span class="icon">📈</span> IQP por Período — Produtos</div>
+        <div class="chart-container"><canvas id="chart-iqp-produto"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- end tab-iqp -->
 
 </div>
 
@@ -1081,6 +1180,238 @@ function renderSegTimeChart() {
 }
 
 // ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(tab)));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'iqp') renderIQP();
+}
+
+// ============================================================
+// IQP — Índice de Qualidade de Produto
+// ============================================================
+let iqpView = 'mom';
+let iqpCharts = {};
+
+function setIQPView(v) {
+  iqpView = v;
+  document.querySelectorAll('[data-iqpview]').forEach(b => b.classList.toggle('active', b.dataset.iqpview === v));
+  renderIQP();
+}
+
+function calcIQP(tickets, allProductTicketCounts) {
+  const total = tickets.length;
+  if (total === 0) return { iqp: 1, total: 0, slaMedian: 0, criticidade: 0 };
+
+  // SLA: mediana dos dias em aberto dos tickets resolvidos
+  const resolved = tickets.filter(t => t.resolutiondate);
+  const daysOpen = resolved.map(t => {
+    const created = new Date(t.created);
+    const res = new Date(t.resolutiondate);
+    return Math.max(0, Math.round((res - created) / (1000 * 60 * 60 * 24)));
+  }).sort((a, b) => a - b);
+  const slaMedian = daysOpen.length > 0
+    ? (daysOpen.length % 2 === 0
+      ? (daysOpen[daysOpen.length / 2 - 1] + daysOpen[daysOpen.length / 2]) / 2
+      : daysOpen[Math.floor(daysOpen.length / 2)])
+    : 0;
+
+  // Criticidade: (Highest + High) / total
+  const highCount = tickets.filter(t => {
+    const p = (t.priorityCX || t.priority || '').toLowerCase();
+    return p === 'highest' || p === 'high';
+  }).length;
+  const criticidade = total > 0 ? highCount / total : 0;
+
+  // Volume normalizado: log scale
+  const counts = allProductTicketCounts.filter(c => c > 0);
+  let volumeNorm = 0;
+  if (counts.length > 1) {
+    const minC = Math.min(...counts);
+    const maxC = Math.max(...counts);
+    if (maxC > minC) {
+      volumeNorm = (Math.log10(total) - Math.log10(minC)) / (Math.log10(maxC) - Math.log10(minC));
+    }
+  }
+
+  // IQP = 1 - (0.2 * volume + 0.4 * min(1, sla/120) + 0.4 * criticidade)
+  const iqp = Math.round((1 - (0.2 * volumeNorm + 0.4 * Math.min(1, slaMedian / 120) + 0.4 * criticidade)) * 1000) / 1000;
+
+  return { iqp: Math.max(0, Math.min(1, iqp)), total, slaMedian: Math.round(slaMedian * 10) / 10, criticidade: Math.round(criticidade * 1000) / 1000 };
+}
+
+function getIQPFilteredData() {
+  const pu = document.getElementById('iqp-filter-pu').value;
+  const from = document.getElementById('iqp-filter-from').value;
+  const to = document.getElementById('iqp-filter-to').value;
+  return RAW_DATA.filter(t => {
+    if (pu !== 'all' && t._pu !== pu) return false;
+    const m = t.created.substring(0, 7);
+    if (from && m < from) return false;
+    if (to && m > to) return false;
+    return true;
+  });
+}
+
+function iqpClass(v) { return v >= 0.7 ? 'iqp-good' : v >= 0.4 ? 'iqp-medium' : 'iqp-bad'; }
+function iqpColor(v) { return v >= 0.7 ? '#10b981' : v >= 0.4 ? '#f59e0b' : '#ef4444'; }
+
+function renderIQP() {
+  const filtered = getIQPFilteredData();
+  if (filtered.length === 0) return;
+
+  // Group by produto
+  const byProduto = {};
+  filtered.forEach(t => {
+    if (!byProduto[t._produto]) byProduto[t._produto] = [];
+    byProduto[t._produto].push(t);
+  });
+  const allCounts = Object.values(byProduto).map(arr => arr.length);
+
+  // IQP by produto
+  const produtoIQPs = Object.entries(byProduto).map(([p, tickets]) => {
+    const r = calcIQP(tickets, allCounts);
+    return { produto: p, pu: derivePU(p), ...r };
+  }).sort((a, b) => b.iqp - a.iqp);
+
+  // IQP by PU
+  const byPU = {};
+  filtered.forEach(t => {
+    if (!byPU[t._pu]) byPU[t._pu] = [];
+    byPU[t._pu].push(t);
+  });
+  const puCounts = Object.values(byPU).map(arr => arr.length);
+  const puIQPs = Object.entries(byPU).map(([pu, tickets]) => {
+    const r = calcIQP(tickets, puCounts);
+    return { pu, ...r };
+  }).sort((a, b) => b.iqp - a.iqp);
+
+  // Render PU table
+  const puTbody = document.getElementById('iqp-table-pu');
+  puTbody.innerHTML = '';
+  puIQPs.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="badge-pu pu-${r.pu.toLowerCase()}">${r.pu}</span></td>
+      <td><span class="iqp-score ${iqpClass(r.iqp)}">${r.iqp.toFixed(3)}</span></td>
+      <td style="width:120px"><div class="iqp-bar"><div class="iqp-bar-fill" style="width:${r.iqp*100}%;background:${iqpColor(r.iqp)}"></div></div></td>
+      <td>${r.total}</td>
+      <td>${r.slaMedian}d</td>
+      <td>${(r.criticidade * 100).toFixed(1)}%</td>
+    `;
+    puTbody.appendChild(tr);
+  });
+
+  // Render Produto table
+  const prodTbody = document.getElementById('iqp-table-produto');
+  prodTbody.innerHTML = '';
+  produtoIQPs.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.produto}</td>
+      <td><span class="badge-pu pu-${r.pu.toLowerCase()}">${r.pu}</span></td>
+      <td><span class="iqp-score ${iqpClass(r.iqp)}">${r.iqp.toFixed(3)}</span></td>
+      <td style="width:100px"><div class="iqp-bar"><div class="iqp-bar-fill" style="width:${r.iqp*100}%;background:${iqpColor(r.iqp)}"></div></div></td>
+      <td>${r.total}</td>
+      <td>${r.slaMedian}d</td>
+      <td>${(r.criticidade * 100).toFixed(1)}%</td>
+    `;
+    prodTbody.appendChild(tr);
+  });
+
+  // Charts
+  renderIQPCharts(filtered);
+}
+
+function renderIQPCharts(filtered) {
+  Object.values(iqpCharts).forEach(c => { if (c) c.destroy(); });
+  iqpCharts = {};
+
+  // Time buckets
+  const buckets = [];
+  if (iqpView === 'wow') {
+    const weeks = {};
+    filtered.forEach(t => {
+      const d = new Date(t.created);
+      const day = d.getDay() || 7;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - day + 1);
+      const key = monday.toISOString().substring(0, 10);
+      if (!weeks[key]) weeks[key] = [];
+      weeks[key].push(t);
+    });
+    Object.keys(weeks).sort().forEach(k => {
+      const d = new Date(k);
+      buckets.push({ label: String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'), tickets: weeks[k] });
+    });
+  } else {
+    const months = {};
+    filtered.forEach(t => {
+      const key = t.created.substring(0, 7);
+      if (!months[key]) months[key] = [];
+      months[key].push(t);
+    });
+    Object.keys(months).sort().forEach(k => {
+      buckets.push({ label: k.substring(2).replace('-','/'), tickets: months[k] });
+    });
+  }
+
+  // PU chart
+  const pus = [...new Set(filtered.map(t => t._pu))].sort();
+  const puColors = { 'Commerce': '#f59e0b', 'Credit': '#3b82f6', 'Trust': '#8b5cf6', 'Sustain': '#10b981' };
+  const puDatasets = pus.map(pu => ({
+    label: pu,
+    data: buckets.map(b => {
+      const puTickets = b.tickets.filter(t => t._pu === pu);
+      if (puTickets.length === 0) return null;
+      const allCounts = pus.map(p => b.tickets.filter(t => t._pu === p).length).filter(c => c > 0);
+      return calcIQP(puTickets, allCounts).iqp;
+    }),
+    borderColor: puColors[pu] || '#888', backgroundColor: 'transparent',
+    tension: .3, pointRadius: 3, borderWidth: 2
+  }));
+  iqpCharts.pu = new Chart(document.getElementById('chart-iqp-pu'), {
+    type: 'line', data: { labels: buckets.map(b => b.label), datasets: puDatasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        y: { min: 0, max: 1, title: { display: true, text: 'IQP' }, grid: { color: '#f0f0f5' } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
+      }
+    }
+  });
+
+  // Produto chart (top 8)
+  const produtos = [...new Set(filtered.map(t => t._produto))].sort();
+  const top8 = produtos.slice(0, 8);
+  const prodDatasets = top8.map((p, i) => ({
+    label: p,
+    data: buckets.map(b => {
+      const pTickets = b.tickets.filter(t => t._produto === p);
+      if (pTickets.length === 0) return null;
+      const allCounts = produtos.map(pr => b.tickets.filter(t => t._produto === pr).length).filter(c => c > 0);
+      return calcIQP(pTickets, allCounts).iqp;
+    }),
+    borderColor: CHART_COLORS[i % CHART_COLORS.length], backgroundColor: 'transparent',
+    tension: .3, pointRadius: 2, borderWidth: 2
+  }));
+  iqpCharts.produto = new Chart(document.getElementById('chart-iqp-produto'), {
+    type: 'line', data: { labels: buckets.map(b => b.label), datasets: prodDatasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        y: { min: 0, max: 1, title: { display: true, text: 'IQP' }, grid: { color: '#f0f0f5' } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ============================================================
 // MODAL — Open Tickets
 // ============================================================
 function showOpenTickets(produto) {
@@ -1196,6 +1527,7 @@ const now = new Date();
 document.getElementById('header-date').textContent =
   'Dados carregados do arquivo local · Use "Atualizar Dados" para buscar do JIRA';
 document.getElementById('filter-to').value = now.toISOString().substring(0, 7);
+document.getElementById('iqp-filter-to').value = now.toISOString().substring(0, 7);
 
 loadData();
 </script>
