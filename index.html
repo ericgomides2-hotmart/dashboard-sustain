@@ -280,8 +280,8 @@
     <div class="filter-group">
       <label>Período</label>
       <div class="toggle-group">
-        <button class="toggle-btn active" data-view="mom" onclick="setView('mom')">MoM</button>
-        <button class="toggle-btn" data-view="wow" onclick="setView('wow')">WoW</button>
+        <button class="toggle-btn active" data-view="mom" onclick="setView('mom')">Mensal</button>
+        <button class="toggle-btn" data-view="wow" onclick="setView('wow')">Semanal</button>
       </div>
     </div>
     <div class="filter-group">
@@ -763,16 +763,20 @@ function getTimeBuckets() {
     const weeks = {};
     FILTERED_DATA.forEach(t => {
       const d = new Date(t.created);
-      const startOfWeek = new Date(d);
-      startOfWeek.setDate(d.getDate() - d.getDay());
-      const key = startOfWeek.toISOString().substring(0, 10);
+      // ISO week: segunda como início da semana
+      const day = d.getDay() || 7; // domingo = 7
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - day + 1);
+      const key = monday.toISOString().substring(0, 10);
       if (!weeks[key]) weeks[key] = [];
       weeks[key].push(t);
     });
-    return Object.keys(weeks).sort().slice(-20).map(k => ({
-      label: 'W ' + k.substring(5),
-      tickets: weeks[k]
-    }));
+    return Object.keys(weeks).sort().map(k => {
+      const d = new Date(k);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return { label: dd + '/' + mm, tickets: weeks[k] };
+    });
   } else {
     const months = {};
     FILTERED_DATA.forEach(t => {
