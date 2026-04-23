@@ -116,9 +116,16 @@
     padding: .45rem .7rem; border: 1px solid var(--border); border-radius: 8px;
     font-size: .8rem; background: var(--card); outline: none; color: var(--text);
   }
-  .filter-group select[multiple] { padding: .3rem; min-height: 28px; max-height: 80px; }
-  .filter-group select[multiple] option { padding: .15rem .4rem; font-size: .75rem; }
   .filter-group select:focus, .filter-group input:focus { border-color: var(--accent); }
+  .chip-group { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .chip {
+    padding: .25rem .6rem; border-radius: 16px; font-size: .72rem; font-weight: 500;
+    border: 1px solid var(--border); background: var(--card); cursor: pointer;
+    transition: all .15s; user-select: none; color: var(--muted);
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .chip.all { font-weight: 600; }
   .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .toggle-btn {
     padding: .45rem .8rem; font-size: .75rem; border: none; background: var(--card);
@@ -289,17 +296,19 @@
   <div class="filters">
     <div class="filter-group">
       <label>PU</label>
-      <select id="filter-pu" multiple onchange="applyFilters()" style="min-width:120px;height:auto;">
-        <option value="Commerce">Commerce</option>
-        <option value="Credit">Credit</option>
-        <option value="Trust">Trust</option>
-        <option value="Sustain">Sustain</option>
-      </select>
+      <div class="chip-group" id="chip-pu">
+        <span class="chip all active" data-value="all" onclick="toggleChip(this,'pu')">Todas</span>
+        <span class="chip" data-value="Commerce" onclick="toggleChip(this,'pu')">Commerce</span>
+        <span class="chip" data-value="Credit" onclick="toggleChip(this,'pu')">Credit</span>
+        <span class="chip" data-value="Trust" onclick="toggleChip(this,'pu')">Trust</span>
+        <span class="chip" data-value="Sustain" onclick="toggleChip(this,'pu')">Sustain</span>
+      </div>
     </div>
     <div class="filter-group">
       <label>Produto</label>
-      <select id="filter-produto" multiple onchange="applyFilters()" style="min-width:140px;height:auto;">
-      </select>
+      <div class="chip-group" id="chip-produto">
+        <span class="chip all active" data-value="all" onclick="toggleChip(this,'produto')">Todos</span>
+      </div>
     </div>
     <div class="filter-group">
       <label>Período</label>
@@ -744,19 +753,40 @@ function loadData() {
 }
 
 function populateProductFilter() {
-  const sel = document.getElementById('filter-produto');
+  const container = document.getElementById('chip-produto');
   const prods = [...new Set(RAW_DATA.map(t => t._produto))].sort();
-  sel.innerHTML = '';
+  container.innerHTML = '<span class="chip all active" data-value="all" onclick="toggleChip(this,\'produto\')">Todos</span>';
   prods.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p; opt.textContent = p;
-    sel.appendChild(opt);
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.dataset.value = p;
+    chip.textContent = p;
+    chip.onclick = function() { toggleChip(this, 'produto'); };
+    container.appendChild(chip);
   });
 }
 
-function getSelectedValues(selectId) {
-  const sel = document.getElementById(selectId);
-  return [...sel.selectedOptions].map(o => o.value);
+function toggleChip(el, group) {
+  const container = el.parentElement;
+  const isAll = el.dataset.value === 'all';
+  if (isAll) {
+    container.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    container.querySelector('.chip.all').classList.remove('active');
+    el.classList.toggle('active');
+    // Se nenhum selecionado, ativa "Todos"
+    const anyActive = container.querySelectorAll('.chip.active:not(.all)').length > 0;
+    if (!anyActive) container.querySelector('.chip.all').classList.add('active');
+  }
+  applyFilters();
+}
+
+function getChipValues(containerId) {
+  const container = document.getElementById(containerId);
+  const allChip = container.querySelector('.chip.all');
+  if (allChip && allChip.classList.contains('active')) return [];
+  return [...container.querySelectorAll('.chip.active')].map(c => c.dataset.value);
 }
 
 function setView(v) {
@@ -766,8 +796,8 @@ function setView(v) {
 }
 
 function applyFilters() {
-  const puSel = getSelectedValues('filter-pu');
-  const prodSel = getSelectedValues('filter-produto');
+  const puSel = getChipValues('chip-pu');
+  const prodSel = getChipValues('chip-produto');
   const seg = document.getElementById('filter-seg').value;
   const from = document.getElementById('filter-from').value;
   const to = document.getElementById('filter-to').value;
@@ -946,60 +976,44 @@ function renderVolumeChart() {
 
 function renderSLAChart() {
   const buckets = getTimeBuckets();
-  // Criados por período (all filtered)
-  const criadosData = buckets.map(b => b.tickets.length);
-  // Resolvidos por período
-  const resolvedBk = {};
-  FILTERED_DATA.filter(t => t.resolutiondate).forEach(t => {
-    let key;
-    if (currentView === 'wow') {
-      const d = new Date(t.resolutiondate);
-      const day = d.getDay() || 7;
-      const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
-      key = mon.toISOString().substring(0, 10);
-    } else {
-      key = t.resolutiondate.substring(0, 7);
-    }
-    resolvedBk[key] = (resolvedBk[key] || 0) + 1;
-  });
-  const resolvidosData = buckets.map(b => {
-    const bKey = b._key || (b.tickets[0] ? (function() {
-      const d = new Date(b.tickets[0].created);
-      const day = d.getDay() || 7;
-      const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
-      return mon.toISOString().substring(0, 10);
-    })() : '');
-    return resolvedBk[bKey] || 0;
-  });
-  // SLA médio (horas) por período
+  const produtos = [...new Set(FILTERED_DATA.map(t => t._produto))].sort();
+  const top = produtos.slice(0, 10);
+
+  // Lines: criados por produto
+  const lineDatasets = top.map((p, i) => ({
+    label: p + ' (criados)',
+    data: buckets.map(b => b.tickets.filter(t => t._produto === p).length),
+    type: 'line', yAxisID: 'y',
+    borderColor: CHART_COLORS[i % CHART_COLORS.length],
+    backgroundColor: 'transparent',
+    tension: .3, pointRadius: 2, borderWidth: 2
+  }));
+
+  // Bars: SLA médio geral por período
   const slaData = buckets.map(b => {
     const resolved = b.tickets.filter(t => t.resolutiondate);
     if (resolved.length === 0) return null;
     return Math.round(resolved.reduce((s, t) => s + calcLeadTimeHours(t.created, t.resolutiondate), 0) / resolved.length);
   });
 
+  const barDataset = {
+    label: 'SLA médio (h)',
+    data: slaData, yAxisID: 'y1',
+    type: 'bar',
+    backgroundColor: 'rgba(139,92,246,.25)',
+    borderColor: '#8b5cf6',
+    borderWidth: 1, borderRadius: 3, barPercentage: .4
+  };
+
   charts.sla = new Chart(document.getElementById('chart-sla'), {
     type: 'bar',
-    data: {
-      labels: buckets.map(b => b.label),
-      datasets: [{
-        label: 'Criados', data: criadosData, yAxisID: 'y',
-        backgroundColor: 'rgba(240,78,35,.4)', borderColor: '#F04E23', borderWidth: 1, borderRadius: 3
-      }, {
-        label: 'Resolvidos', data: resolvidosData, yAxisID: 'y',
-        backgroundColor: 'rgba(16,185,129,.4)', borderColor: '#10b981', borderWidth: 1, borderRadius: 3
-      }, {
-        label: 'SLA médio (h)', data: slaData, yAxisID: 'y1', type: 'line',
-        borderColor: '#8b5cf6', backgroundColor: 'transparent',
-        borderWidth: 2, pointRadius: 3, tension: .3
-      }]
-    },
+    data: { labels: buckets.map(b => b.label), datasets: [barDataset, ...lineDatasets] },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 9 }, padding: 6 } } },
       scales: {
         y: { beginAtZero: true, position: 'left', title: { display: true, text: 'tickets' }, grid: { color: '#f0f0f5' } },
-        y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'SLA (horas)' }, grid: { drawOnChartArea: false } },
+        y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'SLA (h)' }, grid: { drawOnChartArea: false } },
         x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
       }
     }
