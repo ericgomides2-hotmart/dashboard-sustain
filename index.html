@@ -1236,7 +1236,7 @@ function getIQPBuckets() {
     });
     return Object.keys(weeks).sort().map(k => {
       const d = new Date(k);
-      return { key: k, label: String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'), tickets: weeks[k] };
+      return { key: k, label: String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(), tickets: weeks[k] };
     });
   } else {
     const months = {};
@@ -1247,7 +1247,10 @@ function getIQPBuckets() {
       if (!months[key]) months[key] = [];
       months[key].push(t);
     });
-    return Object.keys(months).sort().map(k => ({ key: k, label: k.substring(2).replace('-','/'), tickets: months[k] }));
+    return Object.keys(months).sort().map(k => {
+      const parts = k.split('-');
+      return { key: k, label: parts[1]+'/'+parts[0], tickets: months[k] };
+    });
   }
 }
 
@@ -1260,7 +1263,13 @@ function renderIQP() {
   // PU table with period columns
   document.getElementById('iqp-pu-thead').innerHTML = '<tr><th>PU</th>'+buckets.map(b => '<th style="text-align:center;font-size:.7rem;">'+b.label+'</th>').join('')+'</tr>';
   const puTb = document.getElementById('iqp-table-pu'); puTb.innerHTML = '';
-  puList.forEach(puName => {
+  const lastB = buckets[buckets.length-1];
+  const puSorted = puList.map(puName => {
+    const pts = lastB.tickets.filter(t => t._pu === puName);
+    const ac = puList.map(p => lastB.tickets.filter(t => t._pu === p).length).filter(c => c > 0);
+    return { puName, lastIqp: pts.length > 0 ? calcIQP(pts, ac).iqp : 1 };
+  }).sort((a,b) => b.lastIqp - a.lastIqp);
+  puSorted.forEach(({ puName }) => {
     const tr = document.createElement('tr');
     let h = '<td><span class="badge-pu pu-'+puName.toLowerCase()+'">'+puName+'</span></td>';
     buckets.forEach(b => {
