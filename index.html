@@ -307,24 +307,24 @@
   <!-- KPI CARDS -->
   <div class="kpi-grid">
     <div class="kpi-card accent">
-      <div class="kpi-label">Total de Tickets</div>
+      <div class="kpi-label">Total de Tickets Criados</div>
       <div class="kpi-value" id="kpi-total">—</div>
       <div class="kpi-sub" id="kpi-total-sub">no período selecionado</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Tickets Resolvidos</div>
+      <div class="kpi-value" id="kpi-resolved">—</div>
+      <div class="kpi-sub">Done / Concluído</div>
     </div>
     <div class="kpi-card red">
       <div class="kpi-label">Tickets Abertos</div>
       <div class="kpi-value" id="kpi-open">—</div>
       <div class="kpi-sub">status ≠ Done / Cancelado</div>
     </div>
-    <div class="kpi-card green">
+    <div class="kpi-card blue">
       <div class="kpi-label">SLA Médio</div>
       <div class="kpi-value" id="kpi-sla">—</div>
       <div class="kpi-sub">tempo médio de resolução</div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">Lead Time Dev</div>
-      <div class="kpi-value" id="kpi-leadtime">—</div>
-      <div class="kpi-sub">Under Analysis → Done</div>
     </div>
     <div class="kpi-card yellow">
       <div class="kpi-label">Taxa de Transbordo</div>
@@ -341,7 +341,7 @@
   <!-- CHARTS ROW 1 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📈</span> Volumetria de Tickets</div>
+      <div class="chart-title"><span class="icon">📈</span> Volumetria — Criados vs Resolvidos</div>
       <div class="chart-container"><canvas id="chart-volume"></canvas></div>
     </div>
     <div class="chart-card">
@@ -352,10 +352,6 @@
 
   <!-- CHARTS ROW 2 -->
   <div class="charts-grid">
-    <div class="chart-card">
-      <div class="chart-title"><span class="icon">🔄</span> Lead Time Dev (Under Analysis → Done)</div>
-      <div class="chart-container"><canvas id="chart-leadtime"></canvas></div>
-    </div>
     <div class="chart-card">
       <div class="chart-title"><span class="icon">🔀</span> % Transbordo por Período</div>
       <div class="chart-container"><canvas id="chart-transbordo"></canvas></div>
@@ -397,7 +393,6 @@
           <th>Total</th>
           <th>Abertos</th>
           <th>SLA Médio</th>
-          <th>Lead Time</th>
           <th>Transbordo</th>
           <th>8D</th>
           <th>7D</th>
@@ -723,7 +718,6 @@ function renderAll() {
   renderKPIs();
   renderVolumeChart();
   renderSLAChart();
-  renderLeadTimeChart();
   renderTransbordoChart();
   renderAgingChart();
   renderPUChart();
@@ -734,26 +728,19 @@ function renderAll() {
 
 function renderKPIs() {
   const total = FILTERED_DATA.length;
-  const open = FILTERED_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)).length;
   const resolved = FILTERED_DATA.filter(t => t.resolutiondate);
+  const open = FILTERED_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)).length;
   const avgSLA = resolved.length > 0
     ? Math.round(resolved.reduce((s, t) => s + calcLeadTimeHours(t.created, t.resolutiondate), 0) / resolved.length)
-    : 0;
-  // Lead Time Dev: se tiver underAnalysisDate usa, senão usa created como proxy
-  const avgLTDev = resolved.length > 0
-    ? Math.round(resolved.reduce((s, t) => {
-        const start = t.underAnalysisDate || t.created;
-        return s + calcLeadTimeHours(start, t.resolutiondate);
-      }, 0) / resolved.length)
     : 0;
   const transbordados = FILTERED_DATA.filter(t => t.partner && t.partner.trim() !== '').length;
   const openTickets = FILTERED_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
   const aging30 = openTickets.filter(t => calcAging(t.created) === '>30d').length;
 
   document.getElementById('kpi-total').textContent = total.toLocaleString('pt-BR');
+  document.getElementById('kpi-resolved').textContent = resolved.length.toLocaleString('pt-BR');
   document.getElementById('kpi-open').textContent = open.toLocaleString('pt-BR');
   document.getElementById('kpi-sla').textContent = avgSLA > 0 ? avgSLA + 'h' : '—';
-  document.getElementById('kpi-leadtime').textContent = avgLTDev > 0 ? avgLTDev + 'h' : '—';
   document.getElementById('kpi-transbordo').textContent = total > 0 ? Math.round(transbordados / total * 100) + '%' : '—';
   document.getElementById('kpi-aging30').textContent = aging30.toLocaleString('pt-BR');
 }
@@ -797,21 +784,64 @@ const CHART_COLORS = ['#F04E23','#10b981','#f59e0b','#ef4444','#3b82f6','#f97316
 
 function renderVolumeChart() {
   const buckets = getTimeBuckets();
+  // Para resolvidos, agrupar por resolutiondate no mesmo bucket
+  const resolvedBuckets = {};
+  FILTERED_DATA.filter(t => t.resolutiondate).forEach(t => {
+    let key;
+    if (currentView === 'wow') {
+      const d = new Date(t.resolutiondate);
+      const day = d.getDay() || 7;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - day + 1);
+      key = monday.toISOString().substring(0, 10);
+    } else {
+      key = t.resolutiondate.substring(0, 7);
+    }
+    resolvedBuckets[key] = (resolvedBuckets[key] || 0) + 1;
+  });
+
+  // Mapear labels dos buckets para as keys de resolvedBuckets
+  const resolvedData = buckets.map(b => {
+    // Reconstruir a key original do bucket
+    let bKey;
+    if (currentView === 'wow') {
+      // label é dd/mm, precisamos da key original
+      const tSample = b.tickets[0];
+      if (tSample) {
+        const d = new Date(tSample.created);
+        const day = d.getDay() || 7;
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - day + 1);
+        bKey = monday.toISOString().substring(0, 10);
+      }
+    } else {
+      // label é yy/mm → key é 20yy-mm
+      bKey = '20' + b.label.replace('/', '-');
+    }
+    return resolvedBuckets[bKey] || 0;
+  });
+
   charts.volume = new Chart(document.getElementById('chart-volume'), {
     type: 'bar',
     data: {
       labels: buckets.map(b => b.label),
       datasets: [{
-        label: 'Tickets criados',
+        label: 'Criados',
         data: buckets.map(b => b.tickets.length),
         backgroundColor: 'rgba(240,78,35,.55)',
         borderColor: '#F04E23',
+        borderWidth: 1, borderRadius: 4
+      }, {
+        label: 'Resolvidos',
+        data: resolvedData,
+        backgroundColor: 'rgba(16,185,129,.55)',
+        borderColor: '#10b981',
         borderWidth: 1, borderRadius: 4
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         y: { beginAtZero: true, grid: { color: '#f0f0f5' } },
         x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
@@ -835,37 +865,6 @@ function renderSLAChart() {
     tension: .3, pointRadius: 2, borderWidth: 2
   }));
   charts.sla = new Chart(document.getElementById('chart-sla'), {
-    type: 'line',
-    data: { labels: buckets.map(b => b.label), datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
-      scales: {
-        y: { beginAtZero: true, title: { display: true, text: 'horas' }, grid: { color: '#f0f0f5' } },
-        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
-      }
-    }
-  });
-}
-
-function renderLeadTimeChart() {
-  const buckets = getTimeBuckets();
-  const produtos = [...new Set(FILTERED_DATA.map(t => t._produto))].sort();
-  const datasets = produtos.slice(0, 8).map((p, i) => ({
-    label: p,
-    data: buckets.map(b => {
-      const pts = b.tickets.filter(t => t._produto === p && t.resolutiondate);
-      if (pts.length === 0) return null;
-      return Math.round(pts.reduce((s, t) => {
-        const start = t.underAnalysisDate || t.created;
-        return s + calcLeadTimeHours(start, t.resolutiondate);
-      }, 0) / pts.length);
-    }),
-    borderColor: CHART_COLORS[i % CHART_COLORS.length],
-    backgroundColor: 'transparent',
-    tension: .3, pointRadius: 2, borderWidth: 2
-  }));
-  charts.leadtime = new Chart(document.getElementById('chart-leadtime'), {
     type: 'line',
     data: { labels: buckets.map(b => b.label), datasets },
     options: {
@@ -973,12 +972,6 @@ function renderProductTable() {
     const avgSLA = resolved.length > 0
       ? Math.round(resolved.reduce((s, t) => s + calcLeadTimeHours(t.created, t.resolutiondate), 0) / resolved.length)
       : '—';
-    const avgLTDev = resolved.length > 0
-      ? Math.round(resolved.reduce((s, t) => {
-          const start = t.underAnalysisDate || t.created;
-          return s + calcLeadTimeHours(start, t.resolutiondate);
-        }, 0) / resolved.length)
-      : '—';
     const trans = pts.filter(t => t.partner && t.partner.trim() !== '').length;
     const transP = pts.length > 0 ? Math.round(trans / pts.length * 100) + '%' : '0%';
     const a5 = open.filter(t => calcAging(t.created) === '<5d').length;
@@ -998,7 +991,6 @@ function renderProductTable() {
       <td>${pts.length}</td>
       <td><span class="link-open" onclick="showOpenTickets('${p.replace(/'/g, "\\'")}')">${open.length}</span></td>
       <td>${typeof avgSLA === 'number' ? avgSLA + 'h' : avgSLA}</td>
-      <td>${typeof avgLTDev === 'number' ? avgLTDev + 'h' : avgLTDev}</td>
       <td>${transP} (${trans})</td>
       <td>${seg8d}</td>
       <td>${seg7d}</td>
