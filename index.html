@@ -1498,8 +1498,11 @@ function closeModal() {
 // INIT
 // ============================================================
 const now = new Date();
-document.getElementById('header-date').textContent =
-  'Dados carregados do arquivo local · Use "Atualizar Dados" para buscar do JIRA';
+if (typeof JIRA_DATA_DATE === 'string') {
+  document.getElementById('header-date').textContent = 'Última atualização: ' + JIRA_DATA_DATE + ' · ' + RAW_DATA.length + ' tickets';
+} else {
+  document.getElementById('header-date').textContent = RAW_DATA.length + ' tickets carregados';
+}
 document.getElementById('filter-to').value = now.toISOString().substring(0, 7);
 
 loadData();
