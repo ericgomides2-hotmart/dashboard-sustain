@@ -126,6 +126,30 @@
   .chip:hover { border-color: var(--accent); color: var(--text); }
   .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .chip.all { font-weight: 600; }
+
+  /* Dropdown multi-select */
+  .dropdown-multi { position: relative; display: inline-block; }
+  .dropdown-btn {
+    padding: .4rem .7rem; border: 1px solid var(--border); border-radius: 8px;
+    font-size: .8rem; background: var(--card); cursor: pointer; color: var(--text);
+    min-width: 130px; display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+  }
+  .dropdown-btn:hover { border-color: var(--accent); }
+  .dropdown-btn::after { content: '▾'; font-size: .65rem; color: var(--muted); }
+  .dropdown-panel {
+    display: none; position: absolute; top: 100%; left: 0; z-index: 100;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.1); min-width: 180px; max-height: 260px;
+    overflow-y: auto; margin-top: 4px; padding: .3rem 0;
+  }
+  .dropdown-panel.open { display: block; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: .4rem; padding: .35rem .7rem;
+    font-size: .78rem; cursor: pointer; transition: background .1s;
+  }
+  .dropdown-item:hover { background: var(--accent-light); }
+  .dropdown-item input { margin: 0; accent-color: var(--accent); }
+  .dropdown-item.all-item { font-weight: 600; border-bottom: 1px solid var(--border); margin-bottom: .2rem; padding-bottom: .45rem; }
   .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .toggle-btn {
     padding: .45rem .8rem; font-size: .75rem; border: none; background: var(--card);
@@ -296,18 +320,22 @@
   <div class="filters">
     <div class="filter-group">
       <label>PU</label>
-      <div class="chip-group" id="chip-pu">
-        <span class="chip all active" data-value="all" onclick="toggleChip(this,'pu')">Todas</span>
-        <span class="chip" data-value="Commerce" onclick="toggleChip(this,'pu')">Commerce</span>
-        <span class="chip" data-value="Credit" onclick="toggleChip(this,'pu')">Credit</span>
-        <span class="chip" data-value="Trust" onclick="toggleChip(this,'pu')">Trust</span>
-        <span class="chip" data-value="Sustain" onclick="toggleChip(this,'pu')">Sustain</span>
+      <div class="dropdown-multi" id="dd-pu">
+        <div class="dropdown-btn" onclick="toggleDropdown('dd-pu')">Todas</div>
+        <div class="dropdown-panel">
+          <label class="dropdown-item all-item"><input type="checkbox" checked onchange="ddToggleAll('dd-pu',this)"> Todas</label>
+          <label class="dropdown-item"><input type="checkbox" value="Commerce" onchange="ddChanged('dd-pu')"> Commerce</label>
+          <label class="dropdown-item"><input type="checkbox" value="Credit" onchange="ddChanged('dd-pu')"> Credit</label>
+          <label class="dropdown-item"><input type="checkbox" value="Trust" onchange="ddChanged('dd-pu')"> Trust</label>
+          <label class="dropdown-item"><input type="checkbox" value="Sustain" onchange="ddChanged('dd-pu')"> Sustain</label>
+        </div>
       </div>
     </div>
     <div class="filter-group">
       <label>Produto</label>
-      <div class="chip-group" id="chip-produto">
-        <span class="chip all active" data-value="all" onclick="toggleChip(this,'produto')">Todos</span>
+      <div class="dropdown-multi" id="dd-produto">
+        <div class="dropdown-btn" onclick="toggleDropdown('dd-produto')">Todos</div>
+        <div class="dropdown-panel" id="dd-produto-panel"></div>
       </div>
     </div>
     <div class="filter-group">
@@ -753,40 +781,68 @@ function loadData() {
 }
 
 function populateProductFilter() {
-  const container = document.getElementById('chip-produto');
+  const panel = document.getElementById('dd-produto-panel');
   const prods = [...new Set(RAW_DATA.map(t => t._produto))].sort();
-  container.innerHTML = '<span class="chip all active" data-value="all" onclick="toggleChip(this,\'produto\')">Todos</span>';
+  panel.innerHTML = '<label class="dropdown-item all-item"><input type="checkbox" checked onchange="ddToggleAll(\'dd-produto\',this)"> Todos</label>';
   prods.forEach(p => {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.dataset.value = p;
-    chip.textContent = p;
-    chip.onclick = function() { toggleChip(this, 'produto'); };
-    container.appendChild(chip);
+    const lbl = document.createElement('label');
+    lbl.className = 'dropdown-item';
+    lbl.innerHTML = '<input type="checkbox" value="' + p.replace(/"/g,'&quot;') + '" onchange="ddChanged(\'dd-produto\')"> ' + p;
+    panel.appendChild(lbl);
   });
 }
 
-function toggleChip(el, group) {
-  const container = el.parentElement;
-  const isAll = el.dataset.value === 'all';
-  if (isAll) {
-    container.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    el.classList.add('active');
-  } else {
-    container.querySelector('.chip.all').classList.remove('active');
-    el.classList.toggle('active');
-    // Se nenhum selecionado, ativa "Todos"
-    const anyActive = container.querySelectorAll('.chip.active:not(.all)').length > 0;
-    if (!anyActive) container.querySelector('.chip.all').classList.add('active');
+function toggleDropdown(id) {
+  const panel = document.getElementById(id).querySelector('.dropdown-panel');
+  // Close all others
+  document.querySelectorAll('.dropdown-panel.open').forEach(p => { if (p !== panel) p.classList.remove('open'); });
+  panel.classList.toggle('open');
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown-multi')) {
+    document.querySelectorAll('.dropdown-panel.open').forEach(p => p.classList.remove('open'));
   }
+});
+
+function ddToggleAll(id, allCb) {
+  const dd = document.getElementById(id);
+  const cbs = dd.querySelectorAll('.dropdown-item:not(.all-item) input');
+  if (allCb.checked) {
+    cbs.forEach(cb => cb.checked = false);
+  }
+  ddUpdateLabel(id);
   applyFilters();
 }
 
-function getChipValues(containerId) {
-  const container = document.getElementById(containerId);
-  const allChip = container.querySelector('.chip.all');
-  if (allChip && allChip.classList.contains('active')) return [];
-  return [...container.querySelectorAll('.chip.active')].map(c => c.dataset.value);
+function ddChanged(id) {
+  const dd = document.getElementById(id);
+  const allCb = dd.querySelector('.all-item input');
+  const cbs = dd.querySelectorAll('.dropdown-item:not(.all-item) input');
+  const anyChecked = [...cbs].some(cb => cb.checked);
+  allCb.checked = !anyChecked;
+  ddUpdateLabel(id);
+  applyFilters();
+}
+
+function ddUpdateLabel(id) {
+  const dd = document.getElementById(id);
+  const btn = dd.querySelector('.dropdown-btn');
+  const allCb = dd.querySelector('.all-item input');
+  if (allCb.checked) {
+    btn.childNodes[0].textContent = id === 'dd-pu' ? 'Todas' : 'Todos';
+    return;
+  }
+  const checked = [...dd.querySelectorAll('.dropdown-item:not(.all-item) input:checked')].map(cb => cb.value);
+  btn.childNodes[0].textContent = checked.length <= 2 ? checked.join(', ') : checked.length + ' selecionados';
+}
+
+function getDDValues(id) {
+  const dd = document.getElementById(id);
+  const allCb = dd.querySelector('.all-item input');
+  if (allCb.checked) return [];
+  return [...dd.querySelectorAll('.dropdown-item:not(.all-item) input:checked')].map(cb => cb.value);
 }
 
 function setView(v) {
@@ -796,8 +852,8 @@ function setView(v) {
 }
 
 function applyFilters() {
-  const puSel = getChipValues('chip-pu');
-  const prodSel = getChipValues('chip-produto');
+  const puSel = getDDValues('dd-pu');
+  const prodSel = getDDValues('dd-produto');
   const seg = document.getElementById('filter-seg').value;
   const from = document.getElementById('filter-from').value;
   const to = document.getElementById('filter-to').value;
@@ -928,13 +984,15 @@ function renderVolumeChart() {
     return resolvedBuckets[bKey] || 0;
   });
 
-  // Trend line (moving average of created)
+  // Trend lines (moving average)
   const createdData = buckets.map(b => b.tickets.length);
-  const trendData = createdData.map((v, i) => {
-    const window = 3;
-    const start = Math.max(0, i - window + 1);
-    const slice = createdData.slice(start, i + 1);
-    return Math.round(slice.reduce((a, b) => a + b, 0) / slice.length);
+  const trendCreated = createdData.map((v, i) => {
+    const w = 3, start = Math.max(0, i - w + 1);
+    return Math.round(createdData.slice(start, i + 1).reduce((a, b) => a + b, 0) / (i - start + 1));
+  });
+  const trendResolved = resolvedData.map((v, i) => {
+    const w = 3, start = Math.max(0, i - w + 1);
+    return Math.round(resolvedData.slice(start, i + 1).reduce((a, b) => a + b, 0) / (i - start + 1));
   });
 
   charts.volume = new Chart(document.getElementById('chart-volume'), {
@@ -954,13 +1012,15 @@ function renderVolumeChart() {
         borderColor: '#10b981',
         borderWidth: 1, borderRadius: 4
       }, {
-        label: 'Tendência (criados)',
-        data: trendData,
-        type: 'line',
-        borderColor: '#F04E23',
-        backgroundColor: 'transparent',
-        borderWidth: 2, borderDash: [5, 3],
-        pointRadius: 0, tension: .4
+        label: 'Tendência criados',
+        data: trendCreated,
+        type: 'line', borderColor: '#F04E23', backgroundColor: 'transparent',
+        borderWidth: 2, borderDash: [5, 3], pointRadius: 0, tension: .4
+      }, {
+        label: 'Tendência resolvidos',
+        data: trendResolved,
+        type: 'line', borderColor: '#10b981', backgroundColor: 'transparent',
+        borderWidth: 2, borderDash: [5, 3], pointRadius: 0, tension: .4
       }]
     },
     options: {
