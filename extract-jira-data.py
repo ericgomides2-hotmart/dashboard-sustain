@@ -158,9 +158,10 @@ def fetch_all_issues():
 
 def write_data_js(tickets):
     """Gera o arquivo data.js."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now().strftime("%d/%m/%Y %H:%M")
     content = f"// Dados extraídos do JIRA em {now}\n"
     content += f"// Total: {len(tickets)} tickets\n"
+    content += f'var JIRA_DATA_DATE = "{now}";\n'
     content += "var JIRA_DATA = "
     content += json.dumps(tickets, ensure_ascii=False, separators=(",", ":"))
     content += ";\n"

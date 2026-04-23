@@ -22,6 +22,7 @@ jobs:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          TZ: America/Sao_Paulo
         run: python extract-jira-data.py
 
       - name: Commit e Push
