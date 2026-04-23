@@ -76,16 +76,6 @@
     border-radius: 6px; font-size: .75rem; cursor: pointer; color: var(--muted);
   }
   .btn-logout:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
-  .btn-refresh {
-    padding: .4rem .8rem; background: var(--accent); border: 1px solid var(--accent);
-    border-radius: 6px; font-size: .75rem; cursor: pointer; color: #fff; font-weight: 600;
-    transition: all .2s;
-  }
-  .btn-refresh:hover { background: #d4421d; }
-  .btn-refresh:disabled { opacity: .5; cursor: not-allowed; }
-  .btn-refresh .spinner { display: none; }
-  .btn-refresh.loading .spinner { display: inline; }
-  .btn-refresh.loading .label { display: none; }
 
   /* Tabs */
   .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
@@ -265,10 +255,6 @@
     <span class="subtitle" id="header-date">Dados atualizados em D-1</span>
   </div>
   <div class="header-right">
-    <button class="btn-refresh" id="btn-refresh" onclick="document.getElementById('file-upload').click()">
-      <span class="label">📂 Carregar Dados</span>
-    </button>
-    <input type="file" id="file-upload" accept=".js,.json" style="display:none;" onchange="handleFileUpload(event)">
     <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none;">
     <span class="user-name" id="user-name"></span>
     <span class="user-info" id="user-email"></span>
@@ -1370,40 +1356,6 @@ function showOpenTickets(produto) {
 
 function closeModal() {
   document.getElementById('modal-open').style.display = 'none';
-}
-
-// ============================================================
-// UPLOAD — Load data.js file
-// ============================================================
-function handleFileUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  document.getElementById('header-date').textContent = 'Carregando ' + file.name + '...';
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      let text = e.target.result;
-      // Support both data.js (var JIRA_DATA = [...];) and plain JSON
-      if (text.includes('var JIRA_DATA')) {
-        text = text.split('var JIRA_DATA = ')[1].replace(/;\s*$/, '');
-      }
-      const tickets = JSON.parse(text);
-      window.JIRA_DATA = tickets;
-      RAW_DATA = tickets.map(t => {
-        const produto = deriveProduto(t);
-        return { ...t, _produto: produto, _pu: derivePU(produto) };
-      });
-      populateProductFilter();
-      applyFilters();
-      const now = new Date();
-      document.getElementById('header-date').textContent =
-        'Dados carregados em ' + now.toLocaleString('pt-BR') + ' · ' + tickets.length + ' tickets';
-    } catch (err) {
-      document.getElementById('header-date').textContent = '❌ Erro ao ler arquivo: ' + err.message;
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = ''; // reset para permitir re-upload do mesmo arquivo
 }
 
 // ============================================================
