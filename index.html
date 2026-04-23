@@ -265,10 +265,10 @@
     <span class="subtitle" id="header-date">Dados atualizados em D-1</span>
   </div>
   <div class="header-right">
-    <button class="btn-refresh" id="btn-refresh" onclick="refreshData()">
-      <span class="label">🔄 Atualizar Dados</span>
-      <span class="spinner">⏳ Atualizando...</span>
+    <button class="btn-refresh" id="btn-refresh" onclick="document.getElementById('file-upload').click()">
+      <span class="label">📂 Carregar Dados</span>
     </button>
+    <input type="file" id="file-upload" accept=".js,.json" style="display:none;" onchange="handleFileUpload(event)">
     <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none;">
     <span class="user-name" id="user-name"></span>
     <span class="user-info" id="user-email"></span>
@@ -1373,76 +1373,37 @@ function closeModal() {
 }
 
 // ============================================================
-// REFRESH — Fetch live data from JIRA
+// UPLOAD — Load data.js file
 // ============================================================
-async function refreshData() {
-  const btn = document.getElementById('btn-refresh');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  document.getElementById('header-date').textContent = 'Atualizando dados...';
-
-  try {
-    // Open JIRA in a hidden iframe to get auth context, or use current page
-    const jql = '(project = bic AND issuetype = Support AND created >= "2024-08-01") OR (project = CE AND "Camada de Serviço[Select List (cascading)]" IN ("Hotpay: Pagamento, valores aplicados no pós venda, comissão creator", "Cartão Hotmart", "Assinatura: Configuração planos de assinatura, cupons, troca de plano, período trial, cancelamento de assinaturas e qualquer outra ferramenta sobre definir e rodar uma estratégia de vendas recorrentes", "Wallet:Antecipação, solicitação de saque, extrato", Bundle, "WhatsApp e Chat da Plataforma", "Commercial Agent", Antecipação, Saque, KYC, Selfbilling, "Validação cadastro de creator", Extrato, Saldo, Holding, "Renovação antecipada", "Order Bump", "Funil de vendas", "Abandono de carrinho", Builder, "Thanks page", "Fast buy", "Métodos de pagamento", "Cupom de desconto", "Interface do checkout", HUB, "Troca de cartão", "Troca de Plano de assinaturas", "Cadastro de Creators", "Cálculo de Comissão", "Recuperador automático de recorrências", "Cancelamento de assinaturas", "Congelamento e Descongelamento de assinaturas", "Negociação de parcelas", "Smart Installment", "Aprovação de compras", "Reembolso de compras", "Criação de compra", "Remoção de cartão da conta do cliente", "Status de compra", "e-Notas", Send, Pages) AND status NOT IN (canceled, cancelled, cancelado) AND created >= "2024-08-01" AND labels NOT IN (OrderCheckerMaintenance)) ORDER BY id DESC';
-    const fields = 'key,summary,status,priority,created,resolutiondate,labels,customfield_14189,customfield_25966,customfield_14464,customfield_26064,customfield_11854,customfield_25542,customfield_14589';
-    const allIssues = [];
-    let nextPageToken = null;
-
-    while (true) {
-      let url = 'https://hotmart.atlassian.net/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) + '&maxResults=100&fields=' + fields;
-      if (nextPageToken) url += '&nextPageToken=' + encodeURIComponent(nextPageToken);
-      const resp = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
-      if (!resp.ok) throw new Error('JIRA API error: ' + resp.status + '. Verifique se está logado no JIRA.');
-      const data = await resp.json();
-
-      for (const i of (data.issues || [])) {
-        const f = i.fields || {};
-        const cs = f.customfield_14189;
-        const partner = f.customfield_11854;
-        const jp = f.customfield_14589;
-        allIssues.push({
-          key: i.key,
-          summary: (f.summary || '').substring(0, 120),
-          status: f.status ? f.status.name : '',
-          priority: f.priority ? f.priority.name : '',
-          created: f.created || '',
-          resolutiondate: f.resolutiondate || null,
-          labels: f.labels || [],
-          produtoFrente: f.customfield_25966 || '',
-          camadaServico: cs ? (cs.child ? cs.child.value : cs.value || '') : '',
-          priorityCX: f.customfield_14464 ? f.customfield_14464.value : '',
-          segmentacao: f.customfield_26064 ? f.customfield_26064.value : '',
-          partner: Array.isArray(partner) ? partner.map(p => p.value || '').join(', ') : (partner ? (partner.value || '') : ''),
-          jiraProjectKey: f.customfield_25542 || '',
-          jiraProjectName: jp && typeof jp === 'object' ? (jp.name || '') : ''
-        });
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('header-date').textContent = 'Carregando ' + file.name + '...';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      let text = e.target.result;
+      // Support both data.js (var JIRA_DATA = [...];) and plain JSON
+      if (text.includes('var JIRA_DATA')) {
+        text = text.split('var JIRA_DATA = ')[1].replace(/;\s*$/, '');
       }
-
-      document.getElementById('header-date').textContent = 'Atualizando... ' + allIssues.length + ' tickets';
-      if (data.isLast || !data.nextPageToken) break;
-      nextPageToken = data.nextPageToken;
+      const tickets = JSON.parse(text);
+      window.JIRA_DATA = tickets;
+      RAW_DATA = tickets.map(t => {
+        const produto = deriveProduto(t);
+        return { ...t, _produto: produto, _pu: derivePU(produto) };
+      });
+      populateProductFilter();
+      applyFilters();
+      const now = new Date();
+      document.getElementById('header-date').textContent =
+        'Dados carregados em ' + now.toLocaleString('pt-BR') + ' · ' + tickets.length + ' tickets';
+    } catch (err) {
+      document.getElementById('header-date').textContent = '❌ Erro ao ler arquivo: ' + err.message;
     }
-
-    // Update global data
-    window.JIRA_DATA = allIssues;
-    RAW_DATA = allIssues.map(t => {
-      const produto = deriveProduto(t);
-      return { ...t, _produto: produto, _pu: derivePU(produto) };
-    });
-    populateProductFilter();
-    applyFilters();
-
-    const now = new Date();
-    document.getElementById('header-date').textContent =
-      'Atualizado em ' + now.toLocaleString('pt-BR') + ' · ' + allIssues.length + ' tickets';
-
-  } catch (err) {
-    document.getElementById('header-date').textContent = '❌ Erro: ' + err.message;
-    console.error('Refresh error:', err);
-  } finally {
-    btn.classList.remove('loading');
-    btn.disabled = false;
-  }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset para permitir re-upload do mesmo arquivo
 }
 
 // ============================================================
