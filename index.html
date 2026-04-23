@@ -442,7 +442,6 @@
           <option value="Commerce">Commerce</option>
           <option value="Credit">Credit</option>
           <option value="Trust">Trust</option>
-          <option value="Sustain">Sustain</option>
         </select>
       </div>
       <div class="filter-group">
@@ -1271,7 +1270,9 @@ function renderIQP() {
   const allCounts = Object.values(byProduto).map(arr => arr.length);
 
   // IQP by produto
-  const produtoIQPs = Object.entries(byProduto).map(([p, tickets]) => {
+  const produtoIQPs = Object.entries(byProduto)
+    .filter(([p]) => p !== 'N/A')
+    .map(([p, tickets]) => {
     const r = calcIQP(tickets, allCounts);
     return { produto: p, pu: derivePU(p), ...r };
   }).sort((a, b) => b.iqp - a.iqp);
@@ -1283,7 +1284,9 @@ function renderIQP() {
     byPU[t._pu].push(t);
   });
   const puCounts = Object.values(byPU).map(arr => arr.length);
-  const puIQPs = Object.entries(byPU).map(([pu, tickets]) => {
+  const puIQPs = Object.entries(byPU)
+    .filter(([pu]) => pu !== 'Sustain')
+    .map(([pu, tickets]) => {
     const r = calcIQP(tickets, puCounts);
     return { pu, ...r };
   }).sort((a, b) => b.iqp - a.iqp);
@@ -1359,7 +1362,7 @@ function renderIQPCharts(filtered) {
   }
 
   // PU chart
-  const pus = [...new Set(filtered.map(t => t._pu))].sort();
+  const pus = [...new Set(filtered.map(t => t._pu))].filter(p => p !== 'Sustain').sort();
   const puColors = { 'Commerce': '#f59e0b', 'Credit': '#3b82f6', 'Trust': '#8b5cf6', 'Sustain': '#10b981' };
   const puDatasets = pus.map(pu => ({
     label: pu,
@@ -1385,7 +1388,7 @@ function renderIQPCharts(filtered) {
   });
 
   // Produto chart (top 8)
-  const produtos = [...new Set(filtered.map(t => t._produto))].sort();
+  const produtos = [...new Set(filtered.map(t => t._produto))].filter(p => p !== 'N/A').sort();
   const top8 = produtos.slice(0, 8);
   const prodDatasets = top8.map((p, i) => ({
     label: p,
