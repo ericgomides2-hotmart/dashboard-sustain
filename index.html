@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Gestão de Sustain/FS</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg: #f8f9fc;
+    --card: #ffffff;
+    --border: #e8eaf0;
+    --text: #2d3142;
+    --muted: #8b90a0;
+    --accent: #F04E23;
+    --accent-light: #fef0ec;
+    --green: #10b981;
+    --green-light: #ecfdf5;
+    --yellow: #f59e0b;
+    --yellow-light: #fffbeb;
+    --red: #ef4444;
+    --red-light: #fef2f2;
+    --blue: #3b82f6;
+    --blue-light: #eff6ff;
+    --orange: #f97316;
+    --purple: #8b5cf6;
+    --pink: #ec4899;
+    --teal: #14b8a6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+
+  /* Login overlay */
+  #login-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .login-box {
+    background: var(--card); border-radius: 16px; padding: 3rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,.08); text-align: center; max-width: 400px; width: 90%;
+  }
+  .login-box h2 { font-size: 1.4rem; margin-bottom: .5rem; }
+  .login-box p { color: var(--muted); font-size: .85rem; margin-bottom: 1.5rem; }
+  .login-box input {
+    width: 100%; padding: .75rem 1rem; border: 1px solid var(--border);
+    border-radius: 8px; font-size: .9rem; margin-bottom: .5rem; outline: none;
+  }
+  .login-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+  .login-box button {
+    width: 100%; padding: .75rem; background: var(--accent); color: #fff;
+    border: none; border-radius: 8px; font-size: .9rem; font-weight: 600;
+    cursor: pointer; margin-top: .5rem; transition: background .2s;
+  }
+  .login-box button:hover { background: #d4421d; }
+  .login-error { color: var(--red); font-size: .8rem; margin-top: .5rem; display: none; }
+  .google-btn-wrapper { display: flex; justify-content: center; margin-top: .5rem; }
+  .user-avatar { width: 28px; height: 28px; border-radius: 50%; margin-right: .5rem; vertical-align: middle; }
+  .user-name { font-size: .8rem; color: var(--text); font-weight: 500; }
+
+  /* Header */
+  .header {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 1rem; }
+  .header h1 { font-size: 1.2rem; font-weight: 700; }
+  .header .subtitle { color: var(--muted); font-size: .8rem; }
+  .header-right { display: flex; align-items: center; gap: 1rem; }
+  .user-info { font-size: .8rem; color: var(--muted); }
+  .btn-logout {
+    padding: .4rem .8rem; background: none; border: 1px solid var(--border);
+    border-radius: 6px; font-size: .75rem; cursor: pointer; color: var(--muted);
+  }
+  .btn-logout:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
+  .btn-refresh {
+    padding: .4rem .8rem; background: var(--accent); border: 1px solid var(--accent);
+    border-radius: 6px; font-size: .75rem; cursor: pointer; color: #fff; font-weight: 600;
+    transition: all .2s;
+  }
+  .btn-refresh:hover { background: #d4421d; }
+  .btn-refresh:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-refresh .spinner { display: none; }
+  .btn-refresh.loading .spinner { display: inline; }
+  .btn-refresh.loading .label { display: none; }
+
+  /* Layout */
+  .main { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
+
+  /* Filters */
+  .filters {
+    display: flex; gap: .75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;
+  }
+  .filter-group { display: flex; align-items: center; gap: .4rem; }
+  .filter-group label { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .filter-group select, .filter-group input {
+    padding: .45rem .7rem; border: 1px solid var(--border); border-radius: 8px;
+    font-size: .8rem; background: var(--card); outline: none; color: var(--text);
+  }
+  .filter-group select:focus, .filter-group input:focus { border-color: var(--accent); }
+  .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .toggle-btn {
+    padding: .45rem .8rem; font-size: .75rem; border: none; background: var(--card);
+    cursor: pointer; font-weight: 500; color: var(--muted); transition: all .2s;
+  }
+  .toggle-btn.active { background: var(--accent); color: #fff; }
+  .toggle-btn:not(:last-child) { border-right: 1px solid var(--border); }
+
+  /* KPI Cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.2rem; position: relative; overflow: hidden;
+  }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .kpi-card.accent::before { background: var(--accent); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.yellow::before { background: var(--yellow); }
+  .kpi-card.red::before { background: var(--red); }
+  .kpi-card.blue::before { background: var(--blue); }
+  .kpi-card.orange::before { background: var(--orange); }
+  .kpi-label { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: .3rem; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; }
+  .kpi-sub { font-size: .75rem; color: var(--muted); margin-top: .2rem; }
+  .kpi-trend { font-size: .7rem; margin-top: .3rem; }
+  .trend-up { color: var(--red); }
+  .trend-down { color: var(--green); }
+  .trend-neutral { color: var(--muted); }
+
+  /* Charts */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem;
+  }
+  .chart-title { font-size: .85rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+  .chart-title .icon { font-size: 1rem; }
+  .chart-container { position: relative; height: 280px; }
+
+  .charts-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+
+  /* Tables */
+  .table-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.2rem; margin-bottom: 1.5rem; overflow-x: auto;
+  }
+  .table-card table { width: 100%; border-collapse: collapse; }
+  .table-card th {
+    text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--muted); padding: .6rem .8rem; border-bottom: 2px solid var(--border);
+  }
+  .table-card td { padding: .6rem .8rem; border-bottom: 1px solid var(--border); font-size: .82rem; }
+  .table-card tr:hover { background: var(--accent-light); }
+  .table-card tr:last-child td { border-bottom: none; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .7rem; font-weight: 600; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-yellow { background: var(--yellow-light); color: var(--yellow); }
+  .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-blue { background: var(--blue-light); color: var(--blue); }
+  .badge-pu {
+    display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .65rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .3px;
+  }
+  .pu-commerce { background: #fef3c7; color: #92400e; }
+  .pu-credit { background: #dbeafe; color: #1e40af; }
+  .pu-trust { background: #ede9fe; color: #5b21b6; }
+  .pu-sustain { background: #d1fae5; color: #065f46; }
+
+  /* Footer */
+  .footer {
+    text-align: center; color: var(--muted); font-size: .72rem;
+    padding: 1.5rem 2rem; border-top: 1px solid var(--border); margin-top: 1rem;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-box {
+    background: var(--card); border-radius: 12px; padding: 1.5rem;
+    max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,.15);
+  }
+  .modal-box h3 { font-size: 1rem; margin-bottom: 1rem; }
+  .modal-box .close-btn {
+    float: right; background: none; border: none; font-size: 1.2rem;
+    cursor: pointer; color: var(--muted); padding: 0 .3rem;
+  }
+  .modal-box table { width: 100%; border-collapse: collapse; }
+  .modal-box th { text-align: left; font-size: .7rem; text-transform: uppercase; color: var(--muted); padding: .5rem; border-bottom: 2px solid var(--border); }
+  .modal-box td { padding: .5rem; border-bottom: 1px solid var(--border); font-size: .8rem; }
+  .modal-box a { color: var(--accent); text-decoration: none; }
+  .modal-box a:hover { text-decoration: underline; }
+  .link-open { color: var(--accent); cursor: pointer; text-decoration: underline; font-weight: 600; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .charts-grid, .charts-grid-3 { grid-template-columns: 1fr; }
+    .main { padding: 1rem; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+    .filters { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-box">
+    <h2>📊 Dashboard de Gestão de Sustain/FS</h2>
+    <p>Acesso restrito a colaboradores Hotmart.<br>Faça login com sua conta Google @hotmart.com</p>
+    <div class="google-btn-wrapper">
+      <div id="g_id_onload"
+        data-client_id="359841832321-2egesglvsg8c3rnqb69cqbki23jq0hp8.apps.googleusercontent.com"
+        data-callback="handleCredentialResponse"
+        data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard"
+        data-size="large"
+        data-theme="outline"
+        data-text="sign_in_with"
+        data-shape="rectangular"
+        data-logo_alignment="left">
+      </div>
+    </div>
+    <div class="login-error" id="login-error">Apenas contas @hotmart.com são permitidas.</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header" id="app" style="display:none;">
+  <div class="header-left">
+    <h1>📊 Dashboard de Gestão de Sustain/FS</h1>
+    <span class="subtitle" id="header-date">Dados atualizados em D-1</span>
+  </div>
+  <div class="header-right">
+    <button class="btn-refresh" id="btn-refresh" onclick="refreshData()">
+      <span class="label">🔄 Atualizar Dados</span>
+      <span class="spinner">⏳ Atualizando...</span>
+    </button>
+    <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none;">
+    <span class="user-name" id="user-name"></span>
+    <span class="user-info" id="user-email"></span>
+    <button class="btn-logout" onclick="doLogout()">Sair</button>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main" id="main-content" style="display:none;">
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>PU</label>
+      <select id="filter-pu" onchange="applyFilters()">
+        <option value="all">Todas</option>
+        <option value="Commerce">Commerce</option>
+        <option value="Credit">Credit</option>
+        <option value="Trust">Trust</option>
+        <option value="Sustain">Sustain</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Produto</label>
+      <select id="filter-produto" onchange="applyFilters()">
+        <option value="all">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Período</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-view="mom" onclick="setView('mom')">MoM</button>
+        <button class="toggle-btn" data-view="wow" onclick="setView('wow')">WoW</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Segmentação</label>
+      <select id="filter-seg" onchange="applyFilters()">
+        <option value="all">Todas</option>
+        <option value="8D">8D</option>
+        <option value="7D">7D</option>
+        <option value="6D">6D</option>
+        <option value="< 6D">&lt; 6D</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>De</label>
+      <input type="month" id="filter-from" value="2024-08" onchange="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <label>Até</label>
+      <input type="month" id="filter-to" onchange="applyFilters()">
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total de Tickets</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub" id="kpi-total-sub">no período selecionado</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Tickets Abertos</div>
+      <div class="kpi-value" id="kpi-open">—</div>
+      <div class="kpi-sub">status ≠ Done / Cancelado</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">SLA Médio</div>
+      <div class="kpi-value" id="kpi-sla">—</div>
+      <div class="kpi-sub">tempo médio de resolução</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Lead Time Dev</div>
+      <div class="kpi-value" id="kpi-leadtime">—</div>
+      <div class="kpi-sub">Under Analysis → Done</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Taxa de Transbordo</div>
+      <div class="kpi-value" id="kpi-transbordo">—</div>
+      <div class="kpi-sub">tickets com Partner preenchido</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">Aging > 30 dias</div>
+      <div class="kpi-value" id="kpi-aging30">—</div>
+      <div class="kpi-sub">tickets críticos</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">📈</span> Volumetria de Tickets</div>
+      <div class="chart-container"><canvas id="chart-volume"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">⏱️</span> SLA Médio por Produto</div>
+      <div class="chart-container"><canvas id="chart-sla"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">🔄</span> Lead Time Dev (Under Analysis → Done)</div>
+      <div class="chart-container"><canvas id="chart-leadtime"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">🔀</span> % Transbordo por Período</div>
+      <div class="chart-container"><canvas id="chart-transbordo"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 3 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">📊</span> Aging — Distribuição por Produto</div>
+      <div class="chart-container"><canvas id="chart-aging"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">🏷️</span> Distribuição por PU</div>
+      <div class="chart-container"><canvas id="chart-pu"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 4 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">💰</span> Segmentação CX (Faturamento)</div>
+      <div class="chart-container"><canvas id="chart-seg"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="icon">📈</span> Segmentação CX por Período</div>
+      <div class="chart-container"><canvas id="chart-seg-time"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLE: Detalhamento por Produto -->
+  <div class="table-card">
+    <div class="chart-title"><span class="icon">📋</span> Detalhamento por Produto</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>PU</th>
+          <th>Total</th>
+          <th>Abertos</th>
+          <th>SLA Médio</th>
+          <th>Lead Time</th>
+          <th>Transbordo</th>
+          <th>8D</th>
+          <th>7D</th>
+          <th>6D</th>
+          <th>&lt;6D</th>
+          <th>Aging &lt;5d</th>
+          <th>Aging 5-30d</th>
+          <th>Aging &gt;30d</th>
+        </tr>
+      </thead>
+      <tbody id="table-produtos"></tbody>
+    </table>
+  </div>
+
+  <!-- TABLE: Transbordo por Squad -->
+  <div class="table-card">
+    <div class="chart-title"><span class="icon">🔀</span> Transbordo por Squad</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Squad (Partner)</th>
+          <th>Tickets Transbordados</th>
+          <th>% do Total</th>
+          <th>Produto mais frequente</th>
+        </tr>
+      </thead>
+      <tbody id="table-transbordo"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="footer" id="footer" style="display:none;">
+  Dados extraídos via JIRA API · Filtro: projetos BIC + CE (Camada de Serviço) · Dashboard gerado por Kiro
+</div>
+
+<!-- MODAL for open tickets -->
+<div class="modal-overlay" id="modal-open" style="display:none;" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <button class="close-btn" onclick="closeModal()">✕</button>
+    <h3 id="modal-title">Tickets Abertos</h3>
+    <table>
+      <thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority CX</th><th>Segmentação</th><th>Aging</th></tr></thead>
+      <tbody id="modal-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+// ============================================================
+// AUTH — Google Sign-In (@hotmart.com)
+// Mesmo client_id usado pelo FSBU Sprint Review
+// ============================================================
+const ALLOWED_DOMAIN = 'hotmart.com';
+
+function decodeJwtPayload(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
+    '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+  ).join(''));
+  return JSON.parse(jsonPayload);
+}
+
+function handleCredentialResponse(response) {
+  const payload = decodeJwtPayload(response.credential);
+  const email = (payload.email || '').toLowerCase();
+  const domain = email.split('@')[1];
+  if (domain !== ALLOWED_DOMAIN) {
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+  sessionStorage.setItem('cx_auth_token', response.credential);
+  sessionStorage.setItem('cx_user_email', email);
+  sessionStorage.setItem('cx_user_name', payload.name || email);
+  sessionStorage.setItem('cx_user_picture', payload.picture || '');
+  showApp(payload);
+}
+
+function doLogout() {
+  sessionStorage.removeItem('cx_auth_token');
+  sessionStorage.removeItem('cx_user_email');
+  sessionStorage.removeItem('cx_user_name');
+  sessionStorage.removeItem('cx_user_picture');
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('footer').style.display = 'none';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+function showApp(payload) {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('footer').style.display = 'block';
+  document.getElementById('user-email').textContent = payload.email || sessionStorage.getItem('cx_user_email') || '';
+  document.getElementById('user-name').textContent = payload.name || sessionStorage.getItem('cx_user_name') || '';
+  const pic = payload.picture || sessionStorage.getItem('cx_user_picture') || '';
+  if (pic) {
+    const avatar = document.getElementById('user-avatar');
+    avatar.src = pic;
+    avatar.style.display = 'inline';
+  }
+}
+
+// Check existing session on load
+(function() {
+  const token = sessionStorage.getItem('cx_auth_token');
+  if (token) {
+    try {
+      const payload = decodeJwtPayload(token);
+      if (payload.exp * 1000 > Date.now() && (payload.email || '').endsWith('@' + ALLOWED_DOMAIN)) {
+        showApp(payload);
+        return;
+      }
+    } catch (e) {}
+    sessionStorage.removeItem('cx_auth_token');
+  }
+})();
+
+// ============================================================
+// BUSINESS RULES
+// ============================================================
+const PRODUTO_MAP = {
+  'Acesso - Consumer': 'Checkout',
+  'Afiliados e Co-produtor': 'Checkout',
+  'Antecipação': 'Antecipação',
+  'App - Notificações': 'Wallet',
+  'Balanço de Saldo': 'Wallet',
+  'Cadastro de Creators': 'KYC',
+  'Cartão Hotmart': 'Hotcard',
+  'Checkout': 'Checkout',
+  'Club Consumer': 'N/A',
+  'Combos': 'Pixel',
+  'CRI': 'N/A',
+  'Eventos online admin': 'Checkout',
+  'Eventos presenciais consumer': 'Checkout',
+  'Extrato': 'Wallet',
+  'Holding': 'Hotpay',
+  'Installments Commission': 'Installments',
+  'KYC': 'KYC',
+  'Order Checker': 'Checkout',
+  'Outras Solicitações (Controllership)': 'N/A',
+  'Outras Solicitações (prev)': 'Checkout',
+  'Parcelamento Hotmart': 'BNPL',
+  'Payout': 'Payout',
+  'Pixel': 'Pixel',
+  'Plataforma (PF)': 'Hotpay',
+  'Plataforma (prev)': 'Wallet',
+  'Recálculo de Comissão': 'Checkout',
+  'Risk Engine': 'Hotpay',
+  'Routing Engine': 'Checkout',
+  'Saldo': 'Wallet',
+  'Saque': 'Payout',
+  'Subscriptions': 'Subscriptions',
+  'WhatsApp e Chat da Plataforma': 'Whatsapp',
+  'Sales Agent': 'Sales Agent',
+  'Checkout builder': 'Checkout builder',
+  'Checkout Builder': 'Checkout builder',
+  'Collections': 'Collections',
+  'Hotpay': 'Hotpay',
+  'Cash Advance': 'Cash Advance',
+  'eNotas': 'eNotas',
+  'Pages': 'Pages',
+  'Send': 'Send'
+};
+
+const PU_MAP = {
+  'Antecipação': 'Credit', 'BNPL': 'Credit', 'Cash Advance': 'Credit',
+  'Collections': 'Credit', 'Installments': 'Credit',
+  'Checkout': 'Commerce', 'Checkout builder': 'Commerce', 'High Ticket': 'Commerce',
+  'Hotcard': 'Commerce', 'Hotpay': 'Commerce', 'Pixel': 'Commerce', 'Sales Agent': 'Commerce',
+  'eNotas': 'Trust', 'KYC': 'Trust', 'Lead Scoring': 'Trust', 'Marketplace': 'Trust',
+  'Pages': 'Trust', 'Payout': 'Trust', 'Send': 'Trust', 'Whatsapp': 'Trust', 'Wallet': 'Trust',
+  'N/A': 'Sustain', 'Subscriptions': 'Sustain'
+};
+
+const SLA_TARGETS = { 'Highest': 2, 'High': 24, 'Medium': 72, 'Low': 120 };
+
+function deriveProduto(ticket) {
+  // Lógica idêntica à fórmula do Google Sheets:
+  // =IF(LEFT(A;3)="BIC";"Cash Advance";
+  //   IF(REGEXMATCH(Q;"assinaturas");"Subscriptions";
+  //     IF(REGEXMATCH(Q;"e-Notas");"eNotas";
+  //       IF(REGEXMATCH(Q;"Send");"Send";
+  //         IFERROR(VLOOKUP(O;'De Para IQP'!A:B;2;FALSE);"N/A")))))
+
+  // 1. Key começa com BIC → Cash Advance
+  if (ticket.key && ticket.key.startsWith('BIC')) return 'Cash Advance';
+
+  // 2. Camada de Serviço contém "assinaturas" → Subscriptions
+  const cs = (ticket.camadaServico || '').toLowerCase();
+  if (cs.includes('assinatura')) return 'Subscriptions';
+
+  // 3. Camada de Serviço contém "e-Notas" → eNotas
+  if (cs.includes('e-notas') || cs.includes('enotas')) return 'eNotas';
+
+  // 4. Camada de Serviço contém "Send" → Send
+  if (cs.includes('send')) return 'Send';
+
+  // 5. VLOOKUP no [CE] Produto/Frente → tabela De Para IQP
+  if (ticket.produtoFrente && ticket.produtoFrente.trim() !== '') {
+    const mapped = PRODUTO_MAP[ticket.produtoFrente];
+    if (mapped) return mapped;
+  }
+
+  // 6. Não encontrou → N/A
+  return 'N/A';
+}
+
+function derivePU(produto) { return PU_MAP[produto] || 'Sustain'; }
+
+function calcAging(createdDate) {
+  const now = new Date();
+  const created = new Date(createdDate);
+  const diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+  if (diffDays < 5) return '<5d';
+  if (diffDays <= 30) return '5-30d';
+  return '>30d';
+}
+
+function calcLeadTimeHours(created, resolved) {
+  if (!resolved) return null;
+  return Math.round((new Date(resolved) - new Date(created)) / (1000 * 60 * 60));
+}
+
+// ============================================================
+// SAMPLE DATA (replace with JIRA API data via data.js)
+// ============================================================
+
+// Generate realistic sample data
+function generateSampleData() {
+  const produtos = ['Checkout','Subscriptions','Wallet','KYC','Hotpay','Payout','Cash Advance',
+    'eNotas','Pages','Send','Whatsapp','Pixel','BNPL','Hotcard','Sales Agent','Installments',
+    'Checkout builder','Collections','Antecipação','N/A'];
+  const priorities = ['Highest','High','Medium','Low'];
+  const statuses = ['Open','In Progress','Waiting','Done','Concluído'];
+  const squads = ['','','','','Squad Payments','Squad Checkout','Squad Wallet','Squad KYC',
+    'Squad Subscriptions','Squad Payout','','',''];
+  const tickets = [];
+  const startDate = new Date('2024-08-01');
+  const endDate = new Date();
+
+  for (let i = 0; i < 2400; i++) {
+    const created = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
+    const produto = produtos[Math.floor(Math.random() * produtos.length)];
+    const priority = priorities[Math.floor(Math.random() * priorities.length)];
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    const partner = squads[Math.floor(Math.random() * squads.length)];
+    const isDone = status === 'Done' || status === 'Concluído';
+    const leadTimeH = isDone ? Math.floor(Math.random() * 200) + 1 : null;
+    const resolved = isDone ? new Date(created.getTime() + leadTimeH * 3600000) : null;
+    const project = produto === 'Cash Advance' ? 'BIC' : 'CE';
+
+    tickets.push({
+      key: project + '-' + (10000 + i),
+      produtoFrente: produto === 'Cash Advance' ? '' : Object.keys(PRODUTO_MAP).find(k => PRODUTO_MAP[k] === produto) || produto,
+      camadaServico: '',
+      status: status,
+      priority: priority,
+      created: created.toISOString(),
+      resolutiondate: resolved ? resolved.toISOString() : null,
+      partner: partner,
+      _produto: produto,
+      _pu: derivePU(produto)
+    });
+  }
+  return tickets;
+}
+
+let RAW_DATA = [];
+let FILTERED_DATA = [];
+let currentView = 'mom'; // mom or wow
+
+// Try to load external data, fallback to sample
+function loadData() {
+  if (window.JIRA_DATA && window.JIRA_DATA.length > 0) {
+    RAW_DATA = window.JIRA_DATA.map(t => {
+      const produto = deriveProduto(t);
+      return { ...t, _produto: produto, _pu: derivePU(produto) };
+    });
+  } else {
+    RAW_DATA = generateSampleData();
+  }
+  populateProductFilter();
+  applyFilters();
+}
+
+function populateProductFilter() {
+  const sel = document.getElementById('filter-produto');
+  const prods = [...new Set(RAW_DATA.map(t => t._produto))].sort();
+  sel.innerHTML = '<option value="all">Todos</option>';
+  prods.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+}
+
+function setView(v) {
+  currentView = v;
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  renderAll();
+}
+
+function applyFilters() {
+  const pu = document.getElementById('filter-pu').value;
+  const produto = document.getElementById('filter-produto').value;
+  const seg = document.getElementById('filter-seg').value;
+  const from = document.getElementById('filter-from').value;
+  const to = document.getElementById('filter-to').value;
+
+  FILTERED_DATA = RAW_DATA.filter(t => {
+    if (pu !== 'all' && t._pu !== pu) return false;
+    if (produto !== 'all' && t._produto !== produto) return false;
+    if (seg !== 'all' && (t.segmentacao || '') !== seg) return false;
+    const m = t.created.substring(0, 7);
+    if (from && m < from) return false;
+    if (to && m > to) return false;
+    return true;
+  });
+  renderAll();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+let charts = {};
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => { if (c) c.destroy(); });
+  charts = {};
+}
+
+function renderAll() {
+  destroyCharts();
+  renderKPIs();
+  renderVolumeChart();
+  renderSLAChart();
+  renderLeadTimeChart();
+  renderTransbordoChart();
+  renderAgingChart();
+  renderPUChart();
+  renderSegChart();
+  renderSegTimeChart();
+  renderProductTable();
+  renderTransbordoTable();
+}
+
+function renderKPIs() {
+  const total = FILTERED_DATA.length;
+  const open = FILTERED_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)).length;
+  const resolved = FILTERED_DATA.filter(t => t.resolutiondate);
+  const avgSLA = resolved.length > 0
+    ? Math.round(resolved.reduce((s, t) => s + calcLeadTimeHours(t.created, t.resolutiondate), 0) / resolved.length)
+    : 0;
+  // Lead Time Dev: se tiver underAnalysisDate usa, senão usa created como proxy
+  const avgLTDev = resolved.length > 0
+    ? Math.round(resolved.reduce((s, t) => {
+        const start = t.underAnalysisDate || t.created;
+        return s + calcLeadTimeHours(start, t.resolutiondate);
+      }, 0) / resolved.length)
+    : 0;
+  const transbordados = FILTERED_DATA.filter(t => t.partner && t.partner.trim() !== '').length;
+  const openTickets = FILTERED_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
+  const aging30 = openTickets.filter(t => calcAging(t.created) === '>30d').length;
+
+  document.getElementById('kpi-total').textContent = total.toLocaleString('pt-BR');
+  document.getElementById('kpi-open').textContent = open.toLocaleString('pt-BR');
+  document.getElementById('kpi-sla').textContent = avgSLA > 0 ? avgSLA + 'h' : '—';
+  document.getElementById('kpi-leadtime').textContent = avgLTDev > 0 ? avgLTDev + 'h' : '—';
+  document.getElementById('kpi-transbordo').textContent = total > 0 ? Math.round(transbordados / total * 100) + '%' : '—';
+  document.getElementById('kpi-aging30').textContent = aging30.toLocaleString('pt-BR');
+}
+
+function getTimeBuckets() {
+  if (currentView === 'wow') {
+    const weeks = {};
+    FILTERED_DATA.forEach(t => {
+      const d = new Date(t.created);
+      const startOfWeek = new Date(d);
+      startOfWeek.setDate(d.getDate() - d.getDay());
+      const key = startOfWeek.toISOString().substring(0, 10);
+      if (!weeks[key]) weeks[key] = [];
+      weeks[key].push(t);
+    });
+    return Object.keys(weeks).sort().slice(-20).map(k => ({
+      label: 'W ' + k.substring(5),
+      tickets: weeks[k]
+    }));
+  } else {
+    const months = {};
+    FILTERED_DATA.forEach(t => {
+      const key = t.created.substring(0, 7);
+      if (!months[key]) months[key] = [];
+      months[key].push(t);
+    });
+    return Object.keys(months).sort().map(k => ({
+      label: k.substring(2).replace('-', '/'),
+      tickets: months[k]
+    }));
+  }
+}
+
+const CHART_COLORS = ['#F04E23','#10b981','#f59e0b','#ef4444','#3b82f6','#f97316','#8b5cf6',
+  '#ec4899','#14b8a6','#84cc16','#06b6d4','#e11d48','#a855f7','#22d3ee','#fb923c',
+  '#4ade80','#f472b6','#818cf8','#fbbf24','#34d399'];
+
+function renderVolumeChart() {
+  const buckets = getTimeBuckets();
+  charts.volume = new Chart(document.getElementById('chart-volume'), {
+    type: 'bar',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{
+        label: 'Tickets criados',
+        data: buckets.map(b => b.tickets.length),
+        backgroundColor: 'rgba(240,78,35,.55)',
+        borderColor: '#F04E23',
+        borderWidth: 1, borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f0f5' } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderSLAChart() {
+  const buckets = getTimeBuckets();
+  const produtos = [...new Set(FILTERED_DATA.map(t => t._produto))].sort();
+  const datasets = produtos.slice(0, 8).map((p, i) => ({
+    label: p,
+    data: buckets.map(b => {
+      const pts = b.tickets.filter(t => t._produto === p && t.resolutiondate);
+      if (pts.length === 0) return null;
+      return Math.round(pts.reduce((s, t) => s + calcLeadTimeHours(t.created, t.resolutiondate), 0) / pts.length);
+    }),
+    borderColor: CHART_COLORS[i % CHART_COLORS.length],
+    backgroundColor: 'transparent',
+    tension: .3, pointRadius: 2, borderWidth: 2
+  }));
+  charts.sla = new Chart(document.getElementById('chart-sla'), {
+    type: 'line',
+    data: { labels: buckets.map(b => b.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'horas' }, grid: { color: '#f0f0f5' } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderLeadTimeChart() {
+  const buckets = getTimeBuckets();
+  const produtos = [...new Set(FILTERED_DATA.map(t => t._produto))].sort();
+  const datasets = produtos.slice(0, 8).map((p, i) => ({
+    label: p,
+    data: buckets.map(b => {
+      const pts = b.tickets.filter(t => t._produto === p && t.resolutiondate);
+      if (pts.length === 0) return null;
+      return Math.round(pts.reduce((s, t) => {
+        const start = t.underAnalysisDate || t.created;
+        return s + calcLeadTimeHours(start, t.resolutiondate);
+      }, 0) / pts.length);
+    }),
+    borderColor: CHART_COLORS[i % CHART_COLORS.length],
+    backgroundColor: 'transparent',
+    tension: .3, pointRadius: 2, borderWidth: 2
+  }));
+  charts.leadtime = new Chart(document.getElementById('chart-leadtime'), {
+    type: 'line',
+    data: { labels: buckets.map(b => b.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'horas' }, grid: { color: '#f0f0f5' } },
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderTransbordoChart() {
+  const buckets = getTimeBuckets();
+  const datasets = [{
+    label: '% Transbordo',
+    data: buckets.map(b => {
+      const total = b.tickets.length;
+      if (total === 0) return 0;
+      const trans = b.tickets.filter(t => t.partner && t.partner.trim() !== '').length;
+      return Math.round(trans / total * 100);
+    }),
+    backgroundColor: 'rgba(249,115,22,.6)', borderColor: '#f97316',
+    borderWidth: 2, borderRadius: 4, tension: .3, pointRadius: 3, fill: true
+  }];
+  charts.transbordo = new Chart(document.getElementById('chart-transbordo'), {
+    type: 'line',
+    data: { labels: buckets.map(b => b.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y + '% transbordo' } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { beginAtZero: true, max: 100, title: { display: true, text: '%' }, grid: { color: '#f0f0f5' } }
+      }
+    }
+  });
+}
+
+function renderAgingChart() {
+  const produtos = [...new Set(FILTERED_DATA.map(t => t._produto))].sort();
+  const openTickets = FILTERED_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
+  const lt5 = produtos.map(p => openTickets.filter(t => t._produto === p && calcAging(t.created) === '<5d').length);
+  const d530 = produtos.map(p => openTickets.filter(t => t._produto === p && calcAging(t.created) === '5-30d').length);
+  const gt30 = produtos.map(p => openTickets.filter(t => t._produto === p && calcAging(t.created) === '>30d').length);
+
+  charts.aging = new Chart(document.getElementById('chart-aging'), {
+    type: 'bar',
+    data: {
+      labels: produtos,
+      datasets: [
+        { label: '< 5 dias', data: lt5, backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 3 },
+        { label: '5-30 dias', data: d530, backgroundColor: 'rgba(245,158,11,.6)', borderRadius: 3 },
+        { label: '> 30 dias', data: gt30, backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f5' } },
+        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderPUChart() {
+  const puCounts = {};
+  FILTERED_DATA.forEach(t => { puCounts[t._pu] = (puCounts[t._pu] || 0) + 1; });
+  const labels = Object.keys(puCounts).sort();
+  const puColors = { 'Commerce': '#f59e0b', 'Credit': '#3b82f6', 'Trust': '#8b5cf6', 'Sustain': '#10b981' };
+
+  charts.pu = new Chart(document.getElementById('chart-pu'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: labels.map(l => puCounts[l]),
+        backgroundColor: labels.map(l => puColors[l] || '#6366f1'),
+        borderWidth: 2, borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, padding: 15 } }
+      }
+    }
+  });
+}
+
+function renderProductTable() {
+  const produtos = [...new Set(FILTERED_DATA.map(t => t._produto))].sort();
+  const tbody = document.getElementById('table-produtos');
+  tbody.innerHTML = '';
+
+  produtos.forEach(p => {
+    const pts = FILTERED_DATA.filter(t => t._produto === p);
+    const open = pts.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
+    const resolved = pts.filter(t => t.resolutiondate);
+    const avgSLA = resolved.length > 0
+      ? Math.round(resolved.reduce((s, t) => s + calcLeadTimeHours(t.created, t.resolutiondate), 0) / resolved.length)
+      : '—';
+    const avgLTDev = resolved.length > 0
+      ? Math.round(resolved.reduce((s, t) => {
+          const start = t.underAnalysisDate || t.created;
+          return s + calcLeadTimeHours(start, t.resolutiondate);
+        }, 0) / resolved.length)
+      : '—';
+    const trans = pts.filter(t => t.partner && t.partner.trim() !== '').length;
+    const transP = pts.length > 0 ? Math.round(trans / pts.length * 100) + '%' : '0%';
+    const a5 = open.filter(t => calcAging(t.created) === '<5d').length;
+    const a530 = open.filter(t => calcAging(t.created) === '5-30d').length;
+    const a30 = open.filter(t => calcAging(t.created) === '>30d').length;
+    const seg8d = pts.filter(t => t.segmentacao === '8D').length;
+    const seg7d = pts.filter(t => t.segmentacao === '7D').length;
+    const seg6d = pts.filter(t => t.segmentacao === '6D').length;
+    const segLt6d = pts.filter(t => t.segmentacao === '< 6D').length;
+    const pu = derivePU(p);
+    const puClass = 'pu-' + pu.toLowerCase();
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p}</td>
+      <td><span class="badge-pu ${puClass}">${pu}</span></td>
+      <td>${pts.length}</td>
+      <td><span class="link-open" onclick="showOpenTickets('${p.replace(/'/g, "\\'")}')">${open.length}</span></td>
+      <td>${typeof avgSLA === 'number' ? avgSLA + 'h' : avgSLA}</td>
+      <td>${typeof avgLTDev === 'number' ? avgLTDev + 'h' : avgLTDev}</td>
+      <td>${transP} (${trans})</td>
+      <td>${seg8d}</td>
+      <td>${seg7d}</td>
+      <td>${seg6d}</td>
+      <td>${segLt6d}</td>
+      <td><span class="badge badge-green">${a5}</span></td>
+      <td><span class="badge badge-yellow">${a530}</span></td>
+      <td><span class="badge badge-red">${a30}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderTransbordoTable() {
+  const transbordados = FILTERED_DATA.filter(t => t.partner && t.partner.trim() !== '');
+  const squads = {};
+  transbordados.forEach(t => {
+    if (!squads[t.partner]) squads[t.partner] = { count: 0, produtos: {} };
+    squads[t.partner].count++;
+    squads[t.partner].produtos[t._produto] = (squads[t.partner].produtos[t._produto] || 0) + 1;
+  });
+
+  const tbody = document.getElementById('table-transbordo');
+  tbody.innerHTML = '';
+  const total = FILTERED_DATA.length;
+
+  Object.keys(squads).sort((a, b) => squads[b].count - squads[a].count).forEach(sq => {
+    const s = squads[sq];
+    const topProd = Object.entries(s.produtos).sort((a, b) => b[1] - a[1])[0];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${sq}</td>
+      <td>${s.count}</td>
+      <td>${Math.round(s.count / total * 100)}%</td>
+      <td>${topProd ? topProd[0] + ' (' + topProd[1] + ')' : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSegChart() {
+  const segCounts = { '8D': 0, '7D': 0, '6D': 0, '< 6D': 0, 'N/A': 0 };
+  FILTERED_DATA.forEach(t => {
+    const seg = t.segmentacao || '';
+    if (seg === '8D') segCounts['8D']++;
+    else if (seg === '7D') segCounts['7D']++;
+    else if (seg === '6D') segCounts['6D']++;
+    else if (seg === '< 6D') segCounts['< 6D']++;
+    else segCounts['N/A']++;
+  });
+  const labels = ['8D', '7D', '6D', '< 6D', 'N/A'];
+  const segColors = { '8D': '#F04E23', '7D': '#3b82f6', '6D': '#f59e0b', '< 6D': '#ef4444', 'N/A': '#d1d5db' };
+
+  charts.seg = new Chart(document.getElementById('chart-seg'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: labels.map(l => segCounts[l]),
+        backgroundColor: labels.map(l => segColors[l]),
+        borderWidth: 2, borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, padding: 15 } }
+      }
+    }
+  });
+}
+
+function renderSegTimeChart() {
+  const buckets = getTimeBuckets();
+  const segs = ['8D', '7D', '6D', '< 6D'];
+  const segColors = { '8D': '#F04E23', '7D': '#3b82f6', '6D': '#f59e0b', '< 6D': '#ef4444' };
+  const datasets = segs.map(s => ({
+    label: s,
+    data: buckets.map(b => b.tickets.filter(t => (t.segmentacao || '') === s).length),
+    backgroundColor: segColors[s] + '99',
+    borderColor: segColors[s],
+    borderWidth: 1, borderRadius: 2
+  }));
+
+  charts.segTime = new Chart(document.getElementById('chart-seg-time'), {
+    type: 'bar',
+    data: { labels: buckets.map(b => b.label), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f5' } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// MODAL — Open Tickets
+// ============================================================
+function showOpenTickets(produto) {
+  const open = FILTERED_DATA.filter(t =>
+    t._produto === produto &&
+    !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)
+  ).sort((a, b) => new Date(a.created) - new Date(b.created));
+
+  document.getElementById('modal-title').textContent = `Tickets Abertos — ${produto} (${open.length})`;
+  const tbody = document.getElementById('modal-body');
+  tbody.innerHTML = '';
+
+  open.forEach(t => {
+    const aging = calcAging(t.created);
+    const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
+    const jiraUrl = 'https://hotmart.atlassian.net/browse/' + t.key;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
+      <td>${(t.summary || '').substring(0, 80)}</td>
+      <td>${t.status}</td>
+      <td>${t.priorityCX || t.priority || '—'}</td>
+      <td>${t.segmentacao || '—'}</td>
+      <td><span class="badge ${agingClass}">${aging}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('modal-open').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-open').style.display = 'none';
+}
+
+// ============================================================
+// REFRESH — Fetch live data from JIRA
+// ============================================================
+async function refreshData() {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  document.getElementById('header-date').textContent = 'Atualizando dados...';
+
+  try {
+    // Open JIRA in a hidden iframe to get auth context, or use current page
+    const jql = '(project = bic AND issuetype = Support AND created >= "2024-08-01") OR (project = CE AND "Camada de Serviço[Select List (cascading)]" IN ("Hotpay: Pagamento, valores aplicados no pós venda, comissão creator", "Cartão Hotmart", "Assinatura: Configuração planos de assinatura, cupons, troca de plano, período trial, cancelamento de assinaturas e qualquer outra ferramenta sobre definir e rodar uma estratégia de vendas recorrentes", "Wallet:Antecipação, solicitação de saque, extrato", Bundle, "WhatsApp e Chat da Plataforma", "Commercial Agent", Antecipação, Saque, KYC, Selfbilling, "Validação cadastro de creator", Extrato, Saldo, Holding, "Renovação antecipada", "Order Bump", "Funil de vendas", "Abandono de carrinho", Builder, "Thanks page", "Fast buy", "Métodos de pagamento", "Cupom de desconto", "Interface do checkout", HUB, "Troca de cartão", "Troca de Plano de assinaturas", "Cadastro de Creators", "Cálculo de Comissão", "Recuperador automático de recorrências", "Cancelamento de assinaturas", "Congelamento e Descongelamento de assinaturas", "Negociação de parcelas", "Smart Installment", "Aprovação de compras", "Reembolso de compras", "Criação de compra", "Remoção de cartão da conta do cliente", "Status de compra", "e-Notas", Send, Pages) AND status NOT IN (canceled, cancelled, cancelado) AND created >= "2024-08-01" AND labels NOT IN (OrderCheckerMaintenance)) ORDER BY id DESC';
+    const fields = 'key,summary,status,priority,created,resolutiondate,labels,customfield_14189,customfield_25966,customfield_14464,customfield_26064,customfield_11854,customfield_25542,customfield_14589';
+    const allIssues = [];
+    let nextPageToken = null;
+
+    while (true) {
+      let url = 'https://hotmart.atlassian.net/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) + '&maxResults=100&fields=' + fields;
+      if (nextPageToken) url += '&nextPageToken=' + encodeURIComponent(nextPageToken);
+      const resp = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
+      if (!resp.ok) throw new Error('JIRA API error: ' + resp.status + '. Verifique se está logado no JIRA.');
+      const data = await resp.json();
+
+      for (const i of (data.issues || [])) {
+        const f = i.fields || {};
+        const cs = f.customfield_14189;
+        const partner = f.customfield_11854;
+        const jp = f.customfield_14589;
+        allIssues.push({
+          key: i.key,
+          summary: (f.summary || '').substring(0, 120),
+          status: f.status ? f.status.name : '',
+          priority: f.priority ? f.priority.name : '',
+          created: f.created || '',
+          resolutiondate: f.resolutiondate || null,
+          labels: f.labels || [],
+          produtoFrente: f.customfield_25966 || '',
+          camadaServico: cs ? (cs.child ? cs.child.value : cs.value || '') : '',
+          priorityCX: f.customfield_14464 ? f.customfield_14464.value : '',
+          segmentacao: f.customfield_26064 ? f.customfield_26064.value : '',
+          partner: Array.isArray(partner) ? partner.map(p => p.value || '').join(', ') : (partner ? (partner.value || '') : ''),
+          jiraProjectKey: f.customfield_25542 || '',
+          jiraProjectName: jp && typeof jp === 'object' ? (jp.name || '') : ''
+        });
+      }
+
+      document.getElementById('header-date').textContent = 'Atualizando... ' + allIssues.length + ' tickets';
+      if (data.isLast || !data.nextPageToken) break;
+      nextPageToken = data.nextPageToken;
+    }
+
+    // Update global data
+    window.JIRA_DATA = allIssues;
+    RAW_DATA = allIssues.map(t => {
+      const produto = deriveProduto(t);
+      return { ...t, _produto: produto, _pu: derivePU(produto) };
+    });
+    populateProductFilter();
+    applyFilters();
+
+    const now = new Date();
+    document.getElementById('header-date').textContent =
+      'Atualizado em ' + now.toLocaleString('pt-BR') + ' · ' + allIssues.length + ' tickets';
+
+  } catch (err) {
+    document.getElementById('header-date').textContent = '❌ Erro: ' + err.message;
+    console.error('Refresh error:', err);
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+const now = new Date();
+document.getElementById('header-date').textContent =
+  'Dados carregados do arquivo local · Use "Atualizar Dados" para buscar do JIRA';
+document.getElementById('filter-to').value = now.toISOString().substring(0, 7);
+
+loadData();
+</script>
+</body>
+</html>
