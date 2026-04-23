@@ -76,6 +76,12 @@
     border-radius: 6px; font-size: .75rem; cursor: pointer; color: var(--muted);
   }
   .btn-logout:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
+  .btn-refresh {
+    padding: .4rem .8rem; background: var(--accent); border: 1px solid var(--accent);
+    border-radius: 6px; font-size: .75rem; cursor: pointer; color: #fff; font-weight: 600;
+    transition: all .2s; text-decoration: none;
+  }
+  .btn-refresh:hover { background: #d4421d; }
 
   /* Tabs */
   .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
@@ -255,6 +261,9 @@
     <span class="subtitle" id="header-date">Dados atualizados em D-1</span>
   </div>
   <div class="header-right">
+    <button class="btn-refresh" onclick="window.open('https://github.com/ericgomides2-hotmart/dashboard-sustain/actions/workflows/update-data.yml','_blank')">
+      🔄 Atualizar Dados
+    </button>
     <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none;">
     <span class="user-name" id="user-name"></span>
     <span class="user-info" id="user-email"></span>
