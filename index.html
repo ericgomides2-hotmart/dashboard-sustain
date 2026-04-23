@@ -481,7 +481,7 @@
         <div class="chart-container"><canvas id="chart-iqp-pu"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title"><span class="icon">📈</span> IQP por Período — Produtos</div>
+        <div class="chart-title"><span class="icon">📈</span> IQP por Período — Top 10 Produtos (piores)</div>
         <div class="chart-container"><canvas id="chart-iqp-produto"></canvas></div>
       </div>
     </div>
@@ -1211,7 +1211,7 @@ function calcIQP(tickets, allProductTicketCounts) {
 function iqpClass(v) { return v >= 0.7 ? 'iqp-good' : v >= 0.4 ? 'iqp-medium' : 'iqp-bad'; }
 function iqpColor(v) { return v >= 0.7 ? '#10b981' : v >= 0.4 ? '#f59e0b' : '#ef4444'; }
 function iqpCell(val) {
-  if (val === null) return '<td style="text-align:center;color:#ccc;">\u2014</td>';
+  if (val === null) return '<td style="text-align:center;"><span class="iqp-score iqp-good" style="font-size:.85rem;">1.000</span></td>';
   return '<td style="text-align:center;"><span class="iqp-score '+iqpClass(val)+'" style="font-size:.85rem;">'+val.toFixed(3)+'</span></td>';
 }
 
@@ -1317,14 +1317,21 @@ function renderIQP() {
     };})},
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{y:{min:0,max:1,title:{display:true,text:'IQP'},grid:{color:'#f0f0f5'}},x:{grid:{display:false},ticks:{maxRotation:45,font:{size:10}}}}}
   });
-  var top8 = allProds.slice(0,8);
+  // Top 10 produtos sorted by worst IQP in last period (most interesting)
+  var lastBk = buckets[buckets.length-1];
+  var prodRanked = allProds.map(function(p) {
+    var pts = lastBk.tickets.filter(function(t){return t._produto===p;});
+    var ac = allProds.map(function(pr){return lastBk.tickets.filter(function(t){return t._produto===pr;}).length;}).filter(function(c){return c>0;});
+    return { p: p, iqp: pts.length > 0 ? calcIQP(pts,ac).iqp : 1 };
+  }).sort(function(a,b){return a.iqp - b.iqp;});
+  var top10 = prodRanked.slice(0,10).map(function(x){return x.p;});
   iqpCharts.produto = new Chart(document.getElementById('chart-iqp-produto'), {
     type: 'line',
-    data: { labels: buckets.map(function(b){return b.label;}), datasets: top8.map(function(p,i) { return {
+    data: { labels: buckets.map(function(b){return b.label;}), datasets: top10.map(function(p,i) { return {
       label: p, borderColor: CHART_COLORS[i%CHART_COLORS.length], backgroundColor: 'transparent', tension:.3, pointRadius:2, borderWidth:2,
       data: buckets.map(function(b) { var pts=b.tickets.filter(function(t){return t._produto===p;}); if(!pts.length) return null; var ac=allProds.map(function(pr){return b.tickets.filter(function(t){return t._produto===pr;}).length;}).filter(function(c){return c>0;}); return calcIQP(pts,ac).iqp; })
     };})},
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{y:{min:0,max:1,title:{display:true,text:'IQP'},grid:{color:'#f0f0f5'}},x:{grid:{display:false},ticks:{maxRotation:45,font:{size:10}}}}}
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:8,font:{size:9},padding:8}}}, scales:{y:{min:0,max:1,title:{display:true,text:'IQP'},grid:{color:'#f0f0f5'}},x:{grid:{display:false},ticks:{maxRotation:45,font:{size:10}}}}}
   });
 }
 
