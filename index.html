@@ -1218,7 +1218,7 @@ function iqpCell(val) {
 function getIQPBuckets() {
   const pu = document.getElementById('iqp-filter-pu').value;
   const monthsBack = parseInt(document.getElementById('iqp-filter-months').value);
-  let data = RAW_DATA.filter(t => t._pu !== 'Sustain' && t._produto !== 'N/A');
+  let data = RAW_DATA.filter(t => t._produto !== 'N/A');
   if (pu !== 'all') data = data.filter(t => t._pu === pu);
   const now = new Date();
   let fromDate = monthsBack > 0 ? new Date(now.getFullYear(), now.getMonth() - monthsBack, 1) : null;
