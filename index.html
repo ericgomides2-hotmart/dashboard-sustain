@@ -269,10 +269,6 @@
     <span class="subtitle" id="header-date">Dados atualizados em D-1</span>
   </div>
   <div class="header-right">
-    <button class="btn-refresh" onclick="window.open('https://github.com/ericgomides2-hotmart/dashboard-sustain/actions/workflows/update-data.yml','_blank')">
-      🔄 Atualizar Dados
-    </button>
-
   </div>
 </div>
 
@@ -1398,11 +1394,7 @@ function closeModal() {
 // INIT
 // ============================================================
 const now = new Date();
-if (typeof JIRA_DATA_DATE === 'string') {
-  document.getElementById('header-date').textContent = 'Última atualização: ' + JIRA_DATA_DATE + ' · ' + RAW_DATA.length + ' tickets';
-} else {
-  document.getElementById('header-date').textContent = RAW_DATA.length + ' tickets carregados';
-}
+document.getElementById('header-date').textContent = 'Atualizado a cada hora · ' + (typeof JIRA_DATA_DATE === 'string' ? 'Última: ' + JIRA_DATA_DATE + ' · ' : '') + RAW_DATA.length + ' tickets';
 document.getElementById('filter-to').value = now.toISOString().substring(0, 7);
 
 loadData();
