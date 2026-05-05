@@ -241,6 +241,29 @@
   .hm-link { color: inherit; text-decoration: underline; text-decoration-color: rgba(0,0,0,.25); font-weight: 500; cursor: pointer; }
   .hm-link:hover { text-decoration-color: var(--text); }
 
+  /* Expand chart button */
+  .chart-title { position: relative; }
+  .btn-expand {
+    position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 7px; cursor: pointer; color: var(--muted); font-size: .75rem;
+    transition: all .15s; line-height: 1;
+  }
+  .btn-expand:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+  .chart-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 3000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chart-modal-box {
+    background: var(--card); border-radius: 12px; padding: 1.5rem;
+    width: 95vw; height: 85vh; max-width: 1400px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  }
+  .chart-modal-box .chart-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .chart-modal-box .chart-modal-header h3 { font-size: 1rem; font-weight: 600; }
+  .chart-modal-box .chart-modal-canvas { flex: 1; position: relative; min-height: 0; }
+
   /* Modal */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 2000;
@@ -386,11 +409,11 @@
   <!-- CHARTS ROW 1 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📈</span> Volumetria — Criados vs Resolvidos</div>
+      <div class="chart-title"><span class="icon">📈</span> Volumetria — Criados vs Resolvidos<button class="btn-expand" onclick="expandChart('chart-volume','Volumetria — Criados vs Resolvidos')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-volume"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">⏱️</span> Volumetria por Produto + SLA</div>
+      <div class="chart-title"><span class="icon">⏱️</span> Volumetria por Produto + SLA<button class="btn-expand" onclick="expandChart('chart-sla','Volumetria por Produto + SLA')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-sla"></canvas></div>
     </div>
   </div>
@@ -398,11 +421,11 @@
   <!-- CHARTS ROW 2 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">🔀</span> % Transbordo por Período</div>
+      <div class="chart-title"><span class="icon">🔀</span> % Transbordo por Período<button class="btn-expand" onclick="expandChart('chart-transbordo','% Transbordo por Período')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-transbordo"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📈</span> Segmentação CX por Período</div>
+      <div class="chart-title"><span class="icon">📈</span> Segmentação CX por Período<button class="btn-expand" onclick="expandChart('chart-seg-time','Segmentação CX por Período')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-seg-time"></canvas></div>
     </div>
   </div>
@@ -410,11 +433,11 @@
   <!-- CHARTS ROW 3 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📊</span> Aging — Distribuição por Produto</div>
+      <div class="chart-title"><span class="icon">📊</span> Aging — Distribuição por Produto<button class="btn-expand" onclick="expandChart('chart-aging','Aging — Distribuição por Produto')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-aging"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">🏷️</span> Distribuição por PU</div>
+      <div class="chart-title"><span class="icon">🏷️</span> Distribuição por PU<button class="btn-expand" onclick="expandChart('chart-pu','Distribuição por PU')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-pu"></canvas></div>
     </div>
   </div>
@@ -493,11 +516,11 @@
     <!-- IQP Charts -->
     <div class="charts-grid">
       <div class="chart-card">
-        <div class="chart-title"><span class="icon">📈</span> IQP por Período — PUs</div>
+        <div class="chart-title"><span class="icon">📈</span> IQP por Período — PUs<button class="btn-expand" onclick="expandChart('chart-iqp-pu','IQP por Período — PUs')">⛶</button></div>
         <div class="chart-container"><canvas id="chart-iqp-pu"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title"><span class="icon">📈</span> IQP por Período — Top 10 Produtos (piores)</div>
+        <div class="chart-title"><span class="icon">📈</span> IQP por Período — Top 10 Produtos (piores)<button class="btn-expand" onclick="expandChart('chart-iqp-produto','IQP por Período — Top 10 Produtos')">⛶</button></div>
         <div class="chart-container"><canvas id="chart-iqp-produto"></canvas></div>
       </div>
     </div>
@@ -537,13 +560,24 @@
   Dados extraídos via JIRA API · Filtro: projetos BIC + CE (Camada de Serviço) · Dashboard gerado por Kiro
 </div>
 
+<!-- MODAL for expanded chart -->
+<div class="chart-modal-overlay" id="chart-modal" style="display:none;" onclick="if(event.target===this)closeChartModal()">
+  <div class="chart-modal-box">
+    <div class="chart-modal-header">
+      <h3 id="chart-modal-title"></h3>
+      <button class="close-btn" onclick="closeChartModal()">✕</button>
+    </div>
+    <div class="chart-modal-canvas"><canvas id="chart-modal-canvas"></canvas></div>
+  </div>
+</div>
+
 <!-- MODAL for open tickets -->
 <div class="modal-overlay" id="modal-open" style="display:none;" onclick="if(event.target===this)closeModal()">
   <div class="modal-box">
     <button class="close-btn" onclick="closeModal()">✕</button>
     <h3 id="modal-title">Tickets Abertos</h3>
     <table>
-      <thead id="modal-thead"><tr><th>Key</th><th>Summary</th><th>Produto</th><th></th>Status</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr></thead>
+      <thead id="modal-thead"><tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Seg. CX</th><th>Priority CX</th><th>Aging</th></tr></thead>
       <tbody id="modal-body"></tbody>
     </table>
   </div>
@@ -1403,6 +1437,49 @@ function renderIQP() {
 }
 
 // ============================================================
+// EXPAND CHART — Modal de gráfico ampliado
+// ============================================================
+let expandedChart = null;
+
+function expandChart(canvasId, title) {
+  // Mapear canvasId para o objeto chart correto
+  const chartMap = {
+    'chart-volume': charts.volume,
+    'chart-sla': charts.sla,
+    'chart-transbordo': charts.transbordo,
+    'chart-seg-time': charts.segTime,
+    'chart-aging': charts.aging,
+    'chart-pu': charts.pu,
+    'chart-iqp-pu': iqpCharts.pu,
+    'chart-iqp-produto': iqpCharts.produto
+  };
+  const srcChart = chartMap[canvasId];
+  if (!srcChart) return;
+
+  // Clonar config do gráfico original
+  const config = {
+    type: srcChart.config.type,
+    data: JSON.parse(JSON.stringify(srcChart.config.data)),
+    options: JSON.parse(JSON.stringify(srcChart.config.options))
+  };
+  config.options.responsive = true;
+  config.options.maintainAspectRatio = false;
+
+  document.getElementById('chart-modal-title').textContent = title;
+  document.getElementById('chart-modal').style.display = 'flex';
+
+  if (expandedChart) { expandedChart.destroy(); expandedChart = null; }
+
+  const canvas = document.getElementById('chart-modal-canvas');
+  expandedChart = new Chart(canvas, config);
+}
+
+function closeChartModal() {
+  document.getElementById('chart-modal').style.display = 'none';
+  if (expandedChart) { expandedChart.destroy(); expandedChart = null; }
+}
+
+// ============================================================
 // HEATMAP — Visão Eric
 // ============================================================
 function initHeatmapFilters() {
@@ -1609,12 +1686,12 @@ function showHeatmapTickets(year, month, day, type) {
 
   tickets.sort((a, b) => new Date(a.created) - new Date(b.created));
 
-  // Atualizar thead — sempre 7 colunas
+  // Atualizar thead — sempre 8 colunas
   const thead = document.getElementById('modal-thead');
   if (type === 'saldo') {
-    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Tipo</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Aging</th></tr>';
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Tipo</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Seg. CX</th><th>Aging</th></tr>';
   } else {
-    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Seg. CX</th><th>Priority CX</th><th>Aging</th></tr>';
   }
 
   document.getElementById('modal-title').textContent = title;
@@ -1635,6 +1712,7 @@ function showHeatmapTickets(year, month, day, type) {
         <td>${t._produto || '—'}</td>
         <td>${t.status || '—'}</td>
         <td>${t.assignee || '—'}</td>
+        <td>${t.segmentacao || '—'}</td>
         <td><span class="badge ${agingClass}">${aging}</span></td>
       `;
     } else {
@@ -1644,6 +1722,7 @@ function showHeatmapTickets(year, month, day, type) {
         <td>${t._produto || '—'}</td>
         <td>${t.status || '—'}</td>
         <td>${t.assignee || '—'}</td>
+        <td>${t.segmentacao || '—'}</td>
         <td>${t.priorityCX || t.priority || '—'}</td>
         <td><span class="badge ${agingClass}">${aging}</span></td>
       `;
@@ -1663,7 +1742,7 @@ function showOpenTickets(produto) {
     !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)
   ).sort((a, b) => new Date(a.created) - new Date(b.created));
 
-  document.getElementById('modal-thead').innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
+  document.getElementById('modal-thead').innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Seg. CX</th><th>Priority CX</th><th>Aging</th></tr>';
   document.getElementById('modal-title').textContent = `Tickets Abertos — ${produto} (${open.length})`;
   const tbody = document.getElementById('modal-body');
   tbody.innerHTML = '';
@@ -1679,6 +1758,7 @@ function showOpenTickets(produto) {
       <td>${t._produto || '—'}</td>
       <td>${t.status}</td>
       <td>${t.assignee || '—'}</td>
+      <td>${t.segmentacao || '—'}</td>
       <td>${t.priorityCX || t.priority || '—'}</td>
       <td><span class="badge ${agingClass}">${aging}</span></td>
     `;
