@@ -543,7 +543,7 @@
     <button class="close-btn" onclick="closeModal()">✕</button>
     <h3 id="modal-title">Tickets Abertos</h3>
     <table>
-      <thead id="modal-thead"><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority CX</th><th>Segmentação</th><th>Aging</th></tr></thead>
+      <thead id="modal-thead"><tr><th>Key</th><th>Summary</th><th>Produto</th><th></th>Status</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr></thead>
       <tbody id="modal-body"></tbody>
     </table>
   </div>
@@ -1609,14 +1609,12 @@ function showHeatmapTickets(year, month, day, type) {
 
   tickets.sort((a, b) => new Date(a.created) - new Date(b.created));
 
-  // Atualizar thead conforme tipo
+  // Atualizar thead — sempre 7 colunas
   const thead = document.getElementById('modal-thead');
-  if (type === 'resolved') {
-    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
-  } else if (type === 'saldo') {
-    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Tipo</th><th>Produto</th><th>Status</th><th>Responsável</th></tr>';
+  if (type === 'saldo') {
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Tipo</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Aging</th></tr>';
   } else {
-    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Priority CX</th></tr>';
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
   }
 
   document.getElementById('modal-title').textContent = title;
@@ -1625,19 +1623,10 @@ function showHeatmapTickets(year, month, day, type) {
 
   tickets.forEach(t => {
     const jiraUrl = 'https://hotmart.atlassian.net/browse/' + t.key;
+    const aging = calcAging(t.created);
+    const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
     const tr = document.createElement('tr');
-    if (type === 'resolved') {
-      const aging = calcAging(t.created);
-      const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
-      tr.innerHTML = `
-        <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
-        <td>${(t.summary || '').substring(0, 100)}</td>
-        <td>${t._produto || '—'}</td>
-        <td>${t.assignee || '—'}</td>
-        <td>${t.priorityCX || t.priority || '—'}</td>
-        <td><span class="badge ${agingClass}">${aging}</span></td>
-      `;
-    } else if (type === 'saldo') {
+    if (type === 'saldo') {
       const tipoBadge = t._hmType === 'criado' ? '<span class="badge badge-red">Criado</span>' : '<span class="badge badge-green">Fechado</span>';
       tr.innerHTML = `
         <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
@@ -1646,6 +1635,7 @@ function showHeatmapTickets(year, month, day, type) {
         <td>${t._produto || '—'}</td>
         <td>${t.status || '—'}</td>
         <td>${t.assignee || '—'}</td>
+        <td><span class="badge ${agingClass}">${aging}</span></td>
       `;
     } else {
       tr.innerHTML = `
@@ -1655,6 +1645,7 @@ function showHeatmapTickets(year, month, day, type) {
         <td>${t.status || '—'}</td>
         <td>${t.assignee || '—'}</td>
         <td>${t.priorityCX || t.priority || '—'}</td>
+        <td><span class="badge ${agingClass}">${aging}</span></td>
       `;
     }
     tbody.appendChild(tr);
@@ -1672,6 +1663,7 @@ function showOpenTickets(produto) {
     !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)
   ).sort((a, b) => new Date(a.created) - new Date(b.created));
 
+  document.getElementById('modal-thead').innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
   document.getElementById('modal-title').textContent = `Tickets Abertos — ${produto} (${open.length})`;
   const tbody = document.getElementById('modal-body');
   tbody.innerHTML = '';
@@ -1683,10 +1675,11 @@ function showOpenTickets(produto) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
-      <td>${(t.summary || '').substring(0, 80)}</td>
+      <td>${(t.summary || '').substring(0, 100)}</td>
+      <td>${t._produto || '—'}</td>
       <td>${t.status}</td>
+      <td>${t.assignee || '—'}</td>
       <td>${t.priorityCX || t.priority || '—'}</td>
-      <td>${t.segmentacao || '—'}</td>
       <td><span class="badge ${agingClass}">${aging}</span></td>
     `;
     tbody.appendChild(tr);
