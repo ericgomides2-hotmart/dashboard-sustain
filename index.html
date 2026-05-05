@@ -440,8 +440,8 @@
       <div class="chart-container"><canvas id="chart-aging"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Distribuição por PU<button class="btn-expand" onclick="expandChart('chart-pu','Distribuição por PU')">⛶</button></div>
-      <div class="chart-container"><canvas id="chart-pu"></canvas></div>
+      <div class="chart-title">Aging &gt;30d ao Longo do Tempo<button class="btn-expand" onclick="expandChart('chart-aging-trend','Aging >30d ao Longo do Tempo')">⛶</button></div>
+      <div class="chart-container"><canvas id="chart-aging-trend"></canvas></div>
     </div>
   </div>
 
@@ -886,7 +886,7 @@ function renderAll() {
   renderSLAChart();
   renderTransbordoChart();
   renderAgingChart();
-  renderPUChart();
+  renderAgingTrendChart();
   renderSegTimeChart();
   renderProductTable();
 }
@@ -1136,26 +1136,68 @@ function renderAgingChart() {
   });
 }
 
-function renderPUChart() {
-  const puCounts = {};
-  FILTERED_DATA.forEach(t => { puCounts[t._pu] = (puCounts[t._pu] || 0) + 1; });
-  const labels = Object.keys(puCounts).sort();
-  const puColors = { 'Commerce': '#f59e0b', 'Credit': '#3b82f6', 'Trust': '#8b5cf6', 'Sustain': '#10b981' };
+function renderAgingTrendChart() {
+  const buckets = getTimeBuckets();
+  // Para cada período, calcular quantos tickets estavam abertos com aging >30d naquele momento
+  // Aproximação: no final de cada período, quantos tickets criados >30d antes ainda não tinham sido resolvidos
+  const agingData = buckets.map(b => {
+    // Data de referência = fim do período
+    const refDate = b.tickets.length > 0 ? new Date(b.tickets[0].created) : new Date();
+    // Usar o último dia do bucket como referência
+    let endOfBucket;
+    if (currentView === 'wow') {
+      // Para semanal, pegar a data da última criação no bucket + 7 dias
+      const sample = b.tickets[0];
+      if (sample) {
+        const d = new Date(sample.created);
+        const day = d.getDay() || 7;
+        const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
+        endOfBucket = new Date(monday.getTime() + 7 * 86400000);
+      } else {
+        endOfBucket = new Date();
+      }
+    } else {
+      // Para mensal, fim do mês
+      if (b._key) {
+        const parts = b._key.split('-');
+        endOfBucket = new Date(parseInt(parts[0]), parseInt(parts[1]), 0); // último dia do mês
+      } else {
+        endOfBucket = new Date();
+      }
+    }
+    // Tickets com aging >30d no final deste período:
+    // = criados antes de (endOfBucket - 30 dias) E não resolvidos antes de endOfBucket
+    const threshold = new Date(endOfBucket.getTime() - 30 * 86400000);
+    const count = FILTERED_DATA.filter(t => {
+      const created = new Date(t.created);
+      if (created >= threshold) return false; // aging <= 30d
+      // Não resolvido antes do fim do bucket
+      if (t.resolutiondate && new Date(t.resolutiondate) <= endOfBucket) return false;
+      // Se status é Done sem resolutiondate, não contar
+      if (['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status) && !t.resolutiondate) return false;
+      return true;
+    }).length;
+    return count;
+  });
 
-  charts.pu = new Chart(document.getElementById('chart-pu'), {
-    type: 'doughnut',
+  charts.agingTrend = new Chart(document.getElementById('chart-aging-trend'), {
+    type: 'line',
     data: {
-      labels,
+      labels: buckets.map(b => b.label),
       datasets: [{
-        data: labels.map(l => puCounts[l]),
-        backgroundColor: labels.map(l => puColors[l] || '#6366f1'),
-        borderWidth: 2, borderColor: '#fff'
+        label: 'Tickets com Aging >30d',
+        data: agingData,
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239,68,68,.1)',
+        tension: .3, pointRadius: 3, borderWidth: 2, fill: true
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, padding: 15 } }
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { beginAtZero: true, title: { display: true, text: 'tickets' }, grid: { color: '#f0f0f5' } }
       }
     }
   });
@@ -1637,7 +1679,7 @@ function expandChart(canvasId, title) {
     'chart-transbordo': charts.transbordo,
     'chart-seg-time': charts.segTime,
     'chart-aging': charts.aging,
-    'chart-pu': charts.pu,
+    'chart-aging-trend': charts.agingTrend,
     'chart-iqp-pu': iqpCharts.pu,
     'chart-iqp-produto': iqpCharts.produto
   };
