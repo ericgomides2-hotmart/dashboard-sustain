@@ -559,42 +559,13 @@
 
   <!-- TAB: VISÃO FILA -->
   <div class="tab-content" id="tab-filas">
-
-    <!-- OPÇÃO 1: Kanban de filas -->
-    <div class="chart-card" style="padding:1.5rem;margin-bottom:1.5rem;">
-      <div class="chart-title"><span class="icon">📋</span> Opção 1 — Kanban de Filas (saúde por squad)</div>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Cada card é um squad/fila mostrando tickets abertos, aging médio e top responsáveis.</p>
-      <div id="filas-kanban" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;"></div>
-    </div>
-
-    <!-- OPÇÃO 2: Tabela rankeada -->
-    <div class="table-card" style="margin-bottom:1.5rem;">
-      <div class="chart-title"><span class="icon">📊</span> Opção 2 — Tabela Rankeada por Fila</div>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Squads ordenados pelo mais crítico. Números clicáveis.</p>
-      <table>
-        <thead>
-          <tr><th>Fila (Squad)</th><th>Abertos</th><th>Criados (30d)</th><th>Fechados (30d)</th><th>Saldo 30d</th><th>Aging Médio</th><th>Aging >30d</th><th>Top Responsável</th></tr>
-        </thead>
-        <tbody id="filas-table"></tbody>
-      </table>
-    </div>
-
-    <!-- OPÇÃO 3: Heatmap filas × semanas -->
-    <div class="chart-card" style="padding:1.5rem;margin-bottom:1.5rem;">
-      <div class="chart-title"><span class="icon">🔥</span> Opção 3 — Heatmap Filas × Semanas (saldo)</div>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Linhas = squads, colunas = semanas. Verde = fechando mais, vermelho = acumulando.</p>
+    <div class="chart-card" style="padding:1.5rem;">
+      <div class="chart-title"><span class="icon">�</span> Heatmap por Fila (Squad) — Saldo Semanal</div>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Linhas = squads/filas, colunas = semanas. Verde = fechando mais, vermelho = acumulando. Coluna "Abertos" mostra o total em aberto agora.</p>
       <div style="overflow-x:auto;">
         <table class="heatmap-table" id="filas-heatmap"></table>
       </div>
     </div>
-
-    <!-- OPÇÃO 4: Barras de aging -->
-    <div class="chart-card" style="padding:1.5rem;margin-bottom:1.5rem;">
-      <div class="chart-title"><span class="icon">📊</span> Opção 4 — Barras de Aging por Fila<button class="btn-expand" onclick="expandChart('chart-filas-aging','Aging por Fila')">⛶</button></div>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Barras horizontais empilhadas mostrando distribuição de aging por squad.</p>
-      <div class="chart-container" style="height:400px;"><canvas id="chart-filas-aging"></canvas></div>
-    </div>
-
   </div><!-- end tab-filas -->
 
 </div>
@@ -1481,142 +1452,68 @@ function renderIQP() {
 }
 
 // ============================================================
-// VISÃO FILA — 4 opções de visualização
+// VISÃO FILA — Heatmap por Squad
 // ============================================================
-let filasAgingChart = null;
 
-function getFilasData() {
-  // Agrupar tickets abertos por jiraProjectName (squad/fila)
-  const openTickets = RAW_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
-  const filas = {};
-
-  openTickets.forEach(t => {
-    const fila = t.jiraProjectName || 'Sem projeto';
-    if (!filas[fila]) filas[fila] = { open: [], all: [] };
-    filas[fila].open.push(t);
-  });
-
-  // Dados dos últimos 30 dias para criados/fechados
-  const now = new Date();
-  const d30ago = new Date(now.getTime() - 30 * 86400000);
-
-  RAW_DATA.forEach(t => {
-    const fila = t.jiraProjectName || 'Sem projeto';
-    if (!filas[fila]) filas[fila] = { open: [], all: [] };
-    filas[fila].all.push(t);
-  });
-
-  const result = Object.keys(filas).map(fila => {
-    const open = filas[fila].open;
-    const all = filas[fila].all;
-    const created30d = all.filter(t => new Date(t.created) >= d30ago).length;
-    const resolved30d = all.filter(t => t.resolutiondate && new Date(t.resolutiondate) >= d30ago).length;
-
-    // Aging médio dos abertos
-    const agingDays = open.map(t => Math.floor((now - new Date(t.created)) / 86400000));
-    const avgAging = agingDays.length > 0 ? Math.round(agingDays.reduce((a, b) => a + b, 0) / agingDays.length) : 0;
-    const aging30 = open.filter(t => Math.floor((now - new Date(t.created)) / 86400000) > 30).length;
-    const aging5_30 = open.filter(t => { const d = Math.floor((now - new Date(t.created)) / 86400000); return d >= 5 && d <= 30; }).length;
-    const agingLt5 = open.filter(t => Math.floor((now - new Date(t.created)) / 86400000) < 5).length;
-
-    // Top responsável
-    const assignees = {};
-    open.forEach(t => { const a = t.assignee || ''; if (a) assignees[a] = (assignees[a] || 0) + 1; });
-    const topAssignee = Object.entries(assignees).sort((a, b) => b[1] - a[1])[0];
-
-    return { fila, openCount: open.length, created30d, resolved30d, saldo30d: resolved30d - created30d, avgAging, aging30, aging5_30, agingLt5, topAssignee: topAssignee ? topAssignee[0] + ' (' + topAssignee[1] + ')' : '—', tickets: open };
-  }).filter(f => f.openCount > 0).sort((a, b) => b.openCount - a.openCount);
-
-  return result;
+function deriveSquad(ticket) {
+  // Se tem partner preenchido, usa o partner como squad
+  if (ticket.partner && ticket.partner.trim() !== '') return ticket.partner.trim();
+  // Se produto é Subscriptions, fila = Sustain
+  if (ticket._produto === 'Subscriptions') return 'Sustain';
+  // Sem partner = fila de Sustain
+  return 'Sustain';
 }
 
 function renderFilas() {
-  const data = getFilasData();
-  renderFilasKanban(data);
-  renderFilasTable(data);
   renderFilasHeatmap();
-  renderFilasAgingChart(data);
-}
-
-function renderFilasKanban(data) {
-  const container = document.getElementById('filas-kanban');
-  container.innerHTML = '';
-  data.slice(0, 12).forEach(f => {
-    const agingColor = f.avgAging > 30 ? 'var(--red)' : f.avgAging > 10 ? 'var(--yellow)' : 'var(--green)';
-    const card = document.createElement('div');
-    card.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;';
-    card.innerHTML = `
-      <div style="font-weight:600;font-size:.82rem;margin-bottom:.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${f.fila}">${f.fila}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.75rem;">
-        <div><span style="color:var(--muted);">Abertos</span><br><span style="font-size:1.3rem;font-weight:700;color:var(--red);">${f.openCount}</span></div>
-        <div><span style="color:var(--muted);">Aging médio</span><br><span style="font-size:1.3rem;font-weight:700;color:${agingColor};">${f.avgAging}d</span></div>
-        <div><span style="color:var(--muted);">Aging >30d</span><br><span style="font-weight:600;">${f.aging30}</span></div>
-        <div><span style="color:var(--muted);">Saldo 30d</span><br><span style="font-weight:600;color:${f.saldo30d >= 0 ? 'var(--green)' : 'var(--red)'};">${f.saldo30d > 0 ? '+' : ''}${f.saldo30d}</span></div>
-      </div>
-      <div style="margin-top:.5rem;font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Top: ${f.topAssignee}</div>
-    `;
-    container.appendChild(card);
-  });
-}
-
-function renderFilasTable(data) {
-  const tbody = document.getElementById('filas-table');
-  tbody.innerHTML = '';
-  data.forEach(f => {
-    const saldoColor = f.saldo30d >= 0 ? 'color:var(--green)' : 'color:var(--red)';
-    const agingClass = f.aging30 > 5 ? 'badge-red' : f.aging30 > 0 ? 'badge-yellow' : 'badge-green';
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="font-weight:500;">${f.fila}</td>
-      <td><a class="hm-link" href="javascript:void(0)" onclick="showFilaTickets('${f.fila.replace(/'/g,"\\'")}','open')">${f.openCount}</a></td>
-      <td>${f.created30d}</td>
-      <td>${f.resolved30d}</td>
-      <td style="${saldoColor};font-weight:600;">${f.saldo30d > 0 ? '+' : ''}${f.saldo30d}</td>
-      <td>${f.avgAging}d</td>
-      <td><span class="badge ${agingClass}">${f.aging30}</span></td>
-      <td style="font-size:.75rem;">${f.topAssignee}</td>
-    `;
-    tbody.appendChild(tr);
-  });
 }
 
 function renderFilasHeatmap() {
   const now = new Date();
-  // Últimas 8 semanas
+  // Últimas 10 semanas
   const weeks = [];
-  for (let i = 7; i >= 0; i--) {
+  for (let i = 9; i >= 0; i--) {
     const start = new Date(now.getTime() - (i * 7 + 6) * 86400000);
     const end = new Date(now.getTime() - i * 7 * 86400000);
     weeks.push({ start, end, label: String(start.getDate()).padStart(2,'0') + '/' + String(start.getMonth()+1).padStart(2,'0') });
   }
 
-  // Filas com tickets abertos
+  // Tickets abertos agrupados por squad (partner)
   const openTickets = RAW_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
-  const filasSet = [...new Set(openTickets.map(t => t.jiraProjectName || 'Sem projeto'))].sort();
-  const topFilas = filasSet.slice(0, 15);
+  const squadCounts = {};
+  openTickets.forEach(t => {
+    const squad = deriveSquad(t);
+    squadCounts[squad] = (squadCounts[squad] || 0) + 1;
+  });
 
-  let html = '<thead><tr><th style="position:sticky;left:0;z-index:3;">Fila</th>';
+  // Ordenar squads por quantidade de abertos (desc)
+  const squads = Object.keys(squadCounts).sort((a, b) => squadCounts[b] - squadCounts[a]);
+
+  let html = '<thead><tr><th style="position:sticky;left:0;z-index:3;">Fila (Squad)</th><th class="hm-cell" style="font-weight:700;">Abertos</th>';
   weeks.forEach(w => { html += '<th class="hm-cell">' + w.label + '</th>'; });
   html += '</tr></thead><tbody>';
 
-  topFilas.forEach(fila => {
-    html += '<tr><td class="day-col" style="text-align:left;font-size:.72rem;min-width:160px;">' + fila + '</td>';
+  squads.forEach(squad => {
+    const openCount = squadCounts[squad];
+    html += '<tr><td class="day-col" style="text-align:left;font-size:.72rem;min-width:160px;"><a class="hm-link" href="javascript:void(0)" onclick="showFilaTickets(\'' + squad.replace(/'/g, "\\'") + '\')">' + squad + '</a></td>';
+    html += '<td class="hm-cell" style="font-weight:700;background:var(--red-light);color:var(--red);">' + openCount + '</td>';
+
     weeks.forEach(w => {
       const created = RAW_DATA.filter(t => {
-        if ((t.jiraProjectName || 'Sem projeto') !== fila) return false;
+        if (deriveSquad(t) !== squad) return false;
         const d = new Date(t.created);
         return d >= w.start && d < w.end;
       }).length;
       const resolved = RAW_DATA.filter(t => {
-        if ((t.jiraProjectName || 'Sem projeto') !== fila) return false;
+        if (deriveSquad(t) !== squad) return false;
         if (!t.resolutiondate) return false;
         const d = new Date(t.resolutiondate);
         return d >= w.start && d < w.end;
       }).length;
       const saldo = resolved - created;
       let style = '';
-      if (saldo > 0) { const i = Math.min(saldo / 10, 1); style = 'background:rgba(16,185,129,' + (0.15 + i * 0.5) + ');color:#065f46;'; }
-      else if (saldo < 0) { const i = Math.min(Math.abs(saldo) / 10, 1); style = 'background:rgba(239,68,68,' + (0.15 + i * 0.5) + ');color:#7f1d1d;'; }
+      if (saldo > 0) { const i = Math.min(saldo / 15, 1); style = 'background:rgba(16,185,129,' + (0.15 + i * 0.5) + ');color:#065f46;'; }
+      else if (saldo < 0) { const i = Math.min(Math.abs(saldo) / 15, 1); style = 'background:rgba(239,68,68,' + (0.15 + i * 0.5) + ');color:#7f1d1d;'; }
       html += '<td class="hm-cell" style="' + style + '">' + (saldo !== 0 ? saldo : '') + '</td>';
     });
     html += '</tr>';
@@ -1625,40 +1522,14 @@ function renderFilasHeatmap() {
   document.getElementById('filas-heatmap').innerHTML = html;
 }
 
-function renderFilasAgingChart(data) {
-  if (filasAgingChart) { filasAgingChart.destroy(); filasAgingChart = null; }
-  const top = data.slice(0, 15);
-  filasAgingChart = new Chart(document.getElementById('chart-filas-aging'), {
-    type: 'bar',
-    data: {
-      labels: top.map(f => f.fila.length > 25 ? f.fila.substring(0, 25) + '…' : f.fila),
-      datasets: [
-        { label: '< 5 dias', data: top.map(f => f.agingLt5), backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 3 },
-        { label: '5-30 dias', data: top.map(f => f.aging5_30), backgroundColor: 'rgba(245,158,11,.6)', borderRadius: 3 },
-        { label: '> 30 dias', data: top.map(f => f.aging30), backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 3 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
-      scales: {
-        x: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f5' } },
-        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 }, autoSkip: false } }
-      }
-    }
-  });
-  // Registrar no mapa de charts para o expand funcionar
-  charts['filas-aging'] = filasAgingChart;
-}
-
-function showFilaTickets(fila, type) {
+function showFilaTickets(squad) {
   const tickets = RAW_DATA.filter(t =>
-    (t.jiraProjectName || 'Sem projeto') === fila &&
+    deriveSquad(t) === squad &&
     !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status)
   ).sort((a, b) => new Date(a.created) - new Date(b.created));
 
   document.getElementById('modal-thead').innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Seg. CX</th><th>Priority CX</th><th>Aging</th></tr>';
-  document.getElementById('modal-title').textContent = 'Tickets Abertos — ' + fila + ' (' + tickets.length + ')';
+  document.getElementById('modal-title').textContent = 'Tickets Abertos — ' + squad + ' (' + tickets.length + ')';
   const tbody = document.getElementById('modal-body');
   tbody.innerHTML = '';
 
@@ -1698,8 +1569,7 @@ function expandChart(canvasId, title) {
     'chart-aging': charts.aging,
     'chart-pu': charts.pu,
     'chart-iqp-pu': iqpCharts.pu,
-    'chart-iqp-produto': iqpCharts.produto,
-    'chart-filas-aging': filasAgingChart
+    'chart-iqp-produto': iqpCharts.produto
   };
   const srcChart = chartMap[canvasId];
   if (!srcChart) return;
