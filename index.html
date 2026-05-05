@@ -320,7 +320,7 @@
     <button class="tab-btn active" onclick="switchTab('geral')">Geral</button>
     <button class="tab-btn" onclick="switchTab('iqp')">IQP</button>
     <button class="tab-btn" onclick="switchTab('eric')">Abertos x Fechados por dia</button>
-    <button class="tab-btn" onclick="switchTab('filas')">Visão Fila</button>
+    <button class="tab-btn" onclick="switchTab('filas')">Fila</button>
   </div>
 
   <!-- TAB: GERAL -->
@@ -560,8 +560,17 @@
   <!-- TAB: VISÃO FILA -->
   <div class="tab-content" id="tab-filas">
     <div class="chart-card" style="padding:1.5rem;">
-      <div class="chart-title"><span class="icon">�</span> Heatmap por Fila (Squad) — Saldo Semanal</div>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Linhas = squads/filas, colunas = semanas. Verde = fechando mais, vermelho = acumulando. Coluna "Abertos" mostra o total em aberto agora.</p>
+      <div class="chart-title"><span class="icon">&#128293;</span> Heatmap por Fila (Squad)</div>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Linhas = squads/filas. Verde = fechando mais, vermelho = acumulando. "Saldo Ant." = tickets abertos antes do período visível.</p>
+      <div class="filters" style="margin-bottom:1rem;">
+        <div class="filter-group">
+          <label>Período</label>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-filasview="wow" onclick="setFilasView('wow')">Semanal</button>
+            <button class="toggle-btn" data-filasview="mom" onclick="setFilasView('mom')">Mensal</button>
+          </div>
+        </div>
+      </div>
       <div style="overflow-x:auto;">
         <table class="heatmap-table" id="filas-heatmap"></table>
       </div>
@@ -1464,19 +1473,46 @@ function deriveSquad(ticket) {
   return 'Sustain';
 }
 
+function fmtStatus(status) {
+  if (!status) return '—';
+  if (status === 'Concluído' || status === 'Done') return '<span class="badge badge-green">' + status + '</span>';
+  return status;
+}
+
 function renderFilas() {
+  renderFilasHeatmap();
+}
+
+let filasView = 'wow';
+
+function setFilasView(v) {
+  filasView = v;
+  document.querySelectorAll('[data-filasview]').forEach(b => b.classList.toggle('active', b.dataset.filasview === v));
   renderFilasHeatmap();
 }
 
 function renderFilasHeatmap() {
   const now = new Date();
-  // Últimas 10 semanas
-  const weeks = [];
-  for (let i = 9; i >= 0; i--) {
-    const start = new Date(now.getTime() - (i * 7 + 6) * 86400000);
-    const end = new Date(now.getTime() - i * 7 * 86400000);
-    weeks.push({ start, end, label: String(start.getDate()).padStart(2,'0') + '/' + String(start.getMonth()+1).padStart(2,'0') });
+  let buckets = [];
+
+  if (filasView === 'wow') {
+    // Últimas 10 semanas
+    for (let i = 9; i >= 0; i--) {
+      const start = new Date(now.getTime() - (i * 7 + 6) * 86400000);
+      const end = new Date(now.getTime() - i * 7 * 86400000);
+      buckets.push({ start, end, label: String(start.getDate()).padStart(2,'0') + '/' + String(start.getMonth()+1).padStart(2,'0') });
+    }
+  } else {
+    // Últimos 6 meses
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      const label = String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+      buckets.push({ start: d, end, label });
+    }
   }
+
+  const firstBucketStart = buckets[0].start;
 
   // Tickets abertos agrupados por squad (partner)
   const openTickets = RAW_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
@@ -1489,26 +1525,39 @@ function renderFilasHeatmap() {
   // Ordenar squads por quantidade de abertos (desc)
   const squads = Object.keys(squadCounts).sort((a, b) => squadCounts[b] - squadCounts[a]);
 
-  let html = '<thead><tr><th style="position:sticky;left:0;z-index:3;">Fila (Squad)</th><th class="hm-cell" style="font-weight:700;">Abertos</th>';
-  weeks.forEach(w => { html += '<th class="hm-cell">' + w.label + '</th>'; });
+  let html = '<thead><tr><th style="position:sticky;left:0;z-index:3;">Fila (Squad)</th><th class="hm-cell" style="font-weight:700;">Abertos</th><th class="hm-cell">Saldo Ant.</th>';
+  buckets.forEach(b => { html += '<th class="hm-cell">' + b.label + '</th>'; });
   html += '</tr></thead><tbody>';
 
   squads.forEach(squad => {
     const openCount = squadCounts[squad];
+
+    // Saldo anterior: tickets criados antes do período visível que ainda não foram resolvidos antes do período
+    // = tickets criados antes de firstBucketStart que NÃO foram resolvidos antes de firstBucketStart
+    const saldoAnterior = RAW_DATA.filter(t => {
+      if (deriveSquad(t) !== squad) return false;
+      const created = new Date(t.created);
+      if (created >= firstBucketStart) return false; // criado dentro do período
+      // Se foi resolvido antes do período, não conta
+      if (t.resolutiondate && new Date(t.resolutiondate) < firstBucketStart) return false;
+      return true;
+    }).length;
+
     html += '<tr><td class="day-col" style="text-align:left;font-size:.72rem;min-width:160px;"><a class="hm-link" href="javascript:void(0)" onclick="showFilaTickets(\'' + squad.replace(/'/g, "\\'") + '\')">' + squad + '</a></td>';
     html += '<td class="hm-cell" style="font-weight:700;background:var(--red-light);color:var(--red);">' + openCount + '</td>';
+    html += '<td class="hm-cell" style="font-weight:600;color:var(--muted);">' + saldoAnterior + '</td>';
 
-    weeks.forEach(w => {
+    buckets.forEach(b => {
       const created = RAW_DATA.filter(t => {
         if (deriveSquad(t) !== squad) return false;
         const d = new Date(t.created);
-        return d >= w.start && d < w.end;
+        return d >= b.start && d < b.end;
       }).length;
       const resolved = RAW_DATA.filter(t => {
         if (deriveSquad(t) !== squad) return false;
         if (!t.resolutiondate) return false;
         const d = new Date(t.resolutiondate);
-        return d >= w.start && d < w.end;
+        return d >= b.start && d < b.end;
       }).length;
       const saldo = resolved - created;
       let style = '';
@@ -1542,7 +1591,7 @@ function showFilaTickets(squad) {
       <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
       <td>${(t.summary || '').substring(0, 100)}</td>
       <td>${t._produto || '—'}</td>
-      <td>${t.status || '—'}</td>
+      <td>${fmtStatus(t.status)}</td>
       <td>${t.assignee || '—'}</td>
       <td>${t.segmentacao || '—'}</td>
       <td>${t.priorityCX || t.priority || '—'}</td>
@@ -1828,7 +1877,7 @@ function showHeatmapTickets(year, month, day, type) {
         <td>${(t.summary || '').substring(0, 100)}</td>
         <td>${tipoBadge}</td>
         <td>${t._produto || '—'}</td>
-        <td>${t.status || '—'}</td>
+        <td>${fmtStatus(t.status)}</td>
         <td>${t.assignee || '—'}</td>
         <td>${t.segmentacao || '—'}</td>
         <td><span class="badge ${agingClass}">${aging}</span></td>
@@ -1838,7 +1887,7 @@ function showHeatmapTickets(year, month, day, type) {
         <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
         <td>${(t.summary || '').substring(0, 100)}</td>
         <td>${t._produto || '—'}</td>
-        <td>${t.status || '—'}</td>
+        <td>${fmtStatus(t.status)}</td>
         <td>${t.assignee || '—'}</td>
         <td>${t.segmentacao || '—'}</td>
         <td>${t.priorityCX || t.priority || '—'}</td>
@@ -1874,7 +1923,7 @@ function showOpenTickets(produto) {
       <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
       <td>${(t.summary || '').substring(0, 100)}</td>
       <td>${t._produto || '—'}</td>
-      <td>${t.status}</td>
+      <td>${fmtStatus(t.status)}</td>
       <td>${t.assignee || '—'}</td>
       <td>${t.segmentacao || '—'}</td>
       <td>${t.priorityCX || t.priority || '—'}</td>
