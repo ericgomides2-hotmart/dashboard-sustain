@@ -440,7 +440,7 @@
       <div class="chart-container"><canvas id="chart-aging"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Aging &gt;30d ao Longo do Tempo<button class="btn-expand" onclick="expandChart('chart-aging-trend','Aging >30d ao Longo do Tempo')">⛶</button></div>
+      <div class="chart-title">Aging dos Concluídos por Período<button class="btn-expand" onclick="expandChart('chart-aging-trend','Aging dos Concluídos por Período')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-aging-trend"></canvas></div>
     </div>
   </div>
@@ -1138,66 +1138,65 @@ function renderAgingChart() {
 
 function renderAgingTrendChart() {
   const buckets = getTimeBuckets();
-  // Para cada período, calcular quantos tickets estavam abertos com aging >30d naquele momento
-  // Aproximação: no final de cada período, quantos tickets criados >30d antes ainda não tinham sido resolvidos
-  const agingData = buckets.map(b => {
-    // Data de referência = fim do período
-    const refDate = b.tickets.length > 0 ? new Date(b.tickets[0].created) : new Date();
-    // Usar o último dia do bucket como referência
-    let endOfBucket;
+  // Para cada período, contar tickets CONCLUÍDOS naquele período por faixa de aging (tempo até resolução)
+  const lt5 = [], d5_30 = [], gt30 = [];
+
+  buckets.forEach(b => {
+    // Tickets resolvidos neste período
+    let resolved;
     if (currentView === 'wow') {
-      // Para semanal, pegar a data da última criação no bucket + 7 dias
       const sample = b.tickets[0];
-      if (sample) {
-        const d = new Date(sample.created);
-        const day = d.getDay() || 7;
-        const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
-        endOfBucket = new Date(monday.getTime() + 7 * 86400000);
-      } else {
-        endOfBucket = new Date();
-      }
+      if (!sample) { lt5.push(0); d5_30.push(0); gt30.push(0); return; }
+      const d = new Date(sample.created);
+      const day = d.getDay() || 7;
+      const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
+      const bucketStart = monday;
+      const bucketEnd = new Date(monday.getTime() + 7 * 86400000);
+      resolved = FILTERED_DATA.filter(t => {
+        if (!t.resolutiondate) return false;
+        const rd = new Date(t.resolutiondate);
+        return rd >= bucketStart && rd < bucketEnd;
+      });
     } else {
-      // Para mensal, fim do mês
-      if (b._key) {
-        const parts = b._key.split('-');
-        endOfBucket = new Date(parseInt(parts[0]), parseInt(parts[1]), 0); // último dia do mês
-      } else {
-        endOfBucket = new Date();
-      }
+      if (!b._key) { lt5.push(0); d5_30.push(0); gt30.push(0); return; }
+      const parts = b._key.split('-');
+      const bucketStart = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+      const bucketEnd = new Date(parseInt(parts[0]), parseInt(parts[1]), 1);
+      resolved = FILTERED_DATA.filter(t => {
+        if (!t.resolutiondate) return false;
+        const rd = new Date(t.resolutiondate);
+        return rd >= bucketStart && rd < bucketEnd;
+      });
     }
-    // Tickets com aging >30d no final deste período:
-    // = criados antes de (endOfBucket - 30 dias) E não resolvidos antes de endOfBucket
-    const threshold = new Date(endOfBucket.getTime() - 30 * 86400000);
-    const count = FILTERED_DATA.filter(t => {
-      const created = new Date(t.created);
-      if (created >= threshold) return false; // aging <= 30d
-      // Não resolvido antes do fim do bucket
-      if (t.resolutiondate && new Date(t.resolutiondate) <= endOfBucket) return false;
-      // Se status é Done sem resolutiondate, não contar
-      if (['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status) && !t.resolutiondate) return false;
-      return true;
-    }).length;
-    return count;
+
+    let cLt5 = 0, c5_30 = 0, cGt30 = 0;
+    resolved.forEach(t => {
+      const days = Math.floor((new Date(t.resolutiondate) - new Date(t.created)) / 86400000);
+      if (days < 5) cLt5++;
+      else if (days <= 30) c5_30++;
+      else cGt30++;
+    });
+    lt5.push(cLt5);
+    d5_30.push(c5_30);
+    gt30.push(cGt30);
   });
 
   charts.agingTrend = new Chart(document.getElementById('chart-aging-trend'), {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: buckets.map(b => b.label),
-      datasets: [{
-        label: 'Tickets com Aging >30d',
-        data: agingData,
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239,68,68,.1)',
-        tension: .3, pointRadius: 3, borderWidth: 2, fill: true
-      }]
+      datasets: [
+        { label: '< 5 dias', data: lt5, backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 3 },
+        { label: '5-30 dias', data: d5_30, backgroundColor: 'rgba(245,158,11,.6)', borderRadius: 3 },
+        { label: '> 30 dias', data: gt30, backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 3 }
+      ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
-        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
-        y: { beginAtZero: true, title: { display: true, text: 'tickets' }, grid: { color: '#f0f0f5' } }
+        x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, title: { display: true, text: 'concluídos' }, grid: { color: '#f0f0f5' } }
       }
     }
   });
