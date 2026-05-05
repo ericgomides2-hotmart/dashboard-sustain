@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+eu <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -226,6 +226,19 @@
     padding: 1.5rem 2rem; border-top: 1px solid var(--border); margin-top: 1rem;
   }
 
+  /* Heatmap — Visão Eric */
+  .heatmap-wrapper { overflow-x: auto; }
+  .heatmap-table { border-collapse: collapse; width: 100%; font-size: .75rem; font-variant-numeric: tabular-nums; }
+  .heatmap-table th, .heatmap-table td { padding: 4px 8px; text-align: center; border: 1px solid var(--border); white-space: nowrap; }
+  .heatmap-table th { background: var(--bg); font-weight: 600; color: var(--muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .3px; position: sticky; top: 0; z-index: 2; }
+  .heatmap-table th.month-header { background: var(--card); font-size: .8rem; color: var(--text); letter-spacing: 0; }
+  .heatmap-table td.day-col { text-align: right; font-weight: 600; background: var(--bg); color: var(--text); position: sticky; left: 0; z-index: 1; }
+  .heatmap-table tr.total-row td { font-weight: 700; border-top: 2px solid var(--text); background: var(--bg); }
+  .heatmap-table .hm-cell { min-width: 42px; }
+  .heatmap-filters { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+  .heatmap-filters label { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .heatmap-filters select { padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; font-size: .8rem; background: var(--card); }
+
   /* Modal */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 2000;
@@ -279,6 +292,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('geral')">Geral</button>
     <button class="tab-btn" onclick="switchTab('iqp')">IQP</button>
+    <button class="tab-btn" onclick="switchTab('eric')">Abertos x Fechados por dia</button>
   </div>
 
   <!-- TAB: GERAL -->
@@ -488,6 +502,33 @@
 
   </div><!-- end tab-iqp -->
 
+  <!-- TAB: VISÃO ERIC -->
+  <div class="tab-content" id="tab-eric">
+    <div class="chart-card" style="padding:1.5rem;">
+      <div class="chart-title"><span class="icon">🔥</span> Heatmap Diário — Criados vs Fechados vs Saldo</div>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Visualização dia-a-dia para identificar se estamos ganhando ou perdendo o jogo. Verde = saldo positivo (fechando mais). Vermelho = saldo negativo (acumulando).</p>
+      <div class="heatmap-filters">
+        <label>Ano</label>
+        <select id="hm-year" onchange="renderHeatmap()"></select>
+        <label>PU</label>
+        <select id="hm-pu" onchange="renderHeatmap()">
+          <option value="all">Todas</option>
+          <option value="Commerce">Commerce</option>
+          <option value="Credit">Credit</option>
+          <option value="Trust">Trust</option>
+          <option value="Sustain">Sustain</option>
+        </select>
+        <label>Produto</label>
+        <select id="hm-produto" onchange="renderHeatmap()">
+          <option value="all">Todos</option>
+        </select>
+      </div>
+      <div class="heatmap-wrapper">
+        <table class="heatmap-table" id="heatmap-table"></table>
+      </div>
+    </div>
+  </div><!-- end tab-eric -->
+
 </div>
 
 <div class="footer" id="footer">
@@ -673,6 +714,7 @@ function loadData() {
     RAW_DATA = generateSampleData();
   }
   populateProductFilter();
+  initHeatmapFilters();
   applyFilters();
 }
 
@@ -1191,10 +1233,14 @@ function renderSegTimeChart() {
 // TABS
 // ============================================================
 function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(tab)));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.getAttribute('onclick').includes("'" + tab + "'")) b.classList.add('active');
+  });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'iqp') renderIQP();
+  if (tab === 'eric') renderHeatmap();
 }
 
 // ============================================================
@@ -1352,6 +1398,151 @@ function renderIQP() {
     };})},
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:8,font:{size:9},padding:8}}}, scales:{y:{min:0,max:1,title:{display:true,text:'IQP'},grid:{color:'#f0f0f5'}},x:{grid:{display:false},ticks:{maxRotation:45,font:{size:10}}}}}
   });
+}
+
+// ============================================================
+// HEATMAP — Visão Eric
+// ============================================================
+function initHeatmapFilters() {
+  const years = [...new Set(RAW_DATA.map(t => new Date(t.created).getFullYear()))].sort();
+  const sel = document.getElementById('hm-year');
+  sel.innerHTML = '';
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    sel.appendChild(opt);
+  });
+  sel.value = years[years.length - 1];
+  const prods = [...new Set(RAW_DATA.map(t => t._produto))].sort();
+  const prodSel = document.getElementById('hm-produto');
+  prodSel.innerHTML = '<option value="all">Todos</option>';
+  prods.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    prodSel.appendChild(opt);
+  });
+}
+
+function hmCellColor(value, isBalance) {
+  if (value === 0 || value === null || value === undefined) return '';
+  if (isBalance) {
+    if (value > 0) {
+      const intensity = Math.min(value / 30, 1);
+      return 'background:rgba(16,185,129,' + (0.15 + intensity * 0.55) + ');color:#065f46;';
+    } else {
+      const intensity = Math.min(Math.abs(value) / 30, 1);
+      return 'background:rgba(239,68,68,' + (0.15 + intensity * 0.55) + ');color:#7f1d1d;';
+    }
+  } else {
+    const intensity = Math.min(value / 40, 1);
+    return 'background:rgba(59,130,246,' + (0.05 + intensity * 0.25) + ');';
+  }
+}
+
+function renderHeatmap() {
+  const year = parseInt(document.getElementById('hm-year').value);
+  const puFilter = document.getElementById('hm-pu').value;
+  const prodFilter = document.getElementById('hm-produto').value;
+
+  let data = RAW_DATA.filter(t => {
+    const d = new Date(t.created);
+    if (d.getFullYear() !== year) return false;
+    if (puFilter !== 'all' && t._pu !== puFilter) return false;
+    if (prodFilter !== 'all' && t._produto !== prodFilter) return false;
+    return true;
+  });
+
+  let resolvedData = RAW_DATA.filter(t => {
+    if (!t.resolutiondate) return false;
+    const d = new Date(t.resolutiondate);
+    if (d.getFullYear() !== year) return false;
+    if (puFilter !== 'all' && t._pu !== puFilter) return false;
+    if (prodFilter !== 'all' && t._produto !== prodFilter) return false;
+    return true;
+  });
+
+  const monthsWithData = new Set();
+  data.forEach(t => monthsWithData.add(new Date(t.created).getMonth()));
+  resolvedData.forEach(t => monthsWithData.add(new Date(t.resolutiondate).getMonth()));
+  const months = [...monthsWithData].sort((a, b) => a - b);
+
+  if (months.length === 0) {
+    document.getElementById('heatmap-table').innerHTML = '<tr><td style="padding:2rem;color:var(--muted);">Sem dados para o período selecionado.</td></tr>';
+    return;
+  }
+
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  const createdByDayMonth = {};
+  const closedByDayMonth = {};
+
+  data.forEach(t => {
+    const d = new Date(t.created);
+    const m = d.getMonth();
+    const day = d.getDate();
+    if (!createdByDayMonth[m]) createdByDayMonth[m] = {};
+    createdByDayMonth[m][day] = (createdByDayMonth[m][day] || 0) + 1;
+  });
+
+  resolvedData.forEach(t => {
+    const d = new Date(t.resolutiondate);
+    const m = d.getMonth();
+    const day = d.getDate();
+    if (!closedByDayMonth[m]) closedByDayMonth[m] = {};
+    closedByDayMonth[m][day] = (closedByDayMonth[m][day] || 0) + 1;
+  });
+
+  let html = '<thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:3;">Dia</th>';
+  months.forEach(m => {
+    html += '<th colspan="3" class="month-header">' + monthNames[m] + '</th>';
+  });
+  html += '</tr><tr>';
+  months.forEach(() => {
+    html += '<th class="hm-cell">Criados</th><th class="hm-cell">Fechados</th><th class="hm-cell">Saldo</th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  const totals = {};
+  months.forEach(m => { totals[m] = { created: 0, closed: 0 }; });
+
+  for (let day = 1; day <= 31; day++) {
+    html += '<tr><td class="day-col">' + day + '</td>';
+    months.forEach(m => {
+      const daysInMonth = new Date(year, m + 1, 0).getDate();
+      if (day > daysInMonth) {
+        html += '<td class="hm-cell" style="background:var(--bg);"></td><td class="hm-cell" style="background:var(--bg);"></td><td class="hm-cell" style="background:var(--bg);"></td>';
+        return;
+      }
+      const c = (createdByDayMonth[m] && createdByDayMonth[m][day]) || 0;
+      const f = (closedByDayMonth[m] && closedByDayMonth[m][day]) || 0;
+      const saldo = f - c;
+      totals[m].created += c;
+      totals[m].closed += f;
+
+      const cStyle = c > 0 ? hmCellColor(c, false) : '';
+      const fStyle = f > 0 ? hmCellColor(f, false) : '';
+      const sStyle = saldo !== 0 ? hmCellColor(saldo, true) : '';
+
+      html += '<td class="hm-cell" style="' + cStyle + '">' + (c || '') + '</td>';
+      html += '<td class="hm-cell" style="' + fStyle + '">' + (f || '') + '</td>';
+      html += '<td class="hm-cell" style="' + sStyle + '">' + (saldo !== 0 ? saldo : '') + '</td>';
+    });
+    html += '</tr>';
+  }
+
+  html += '<tr class="total-row"><td class="day-col" style="font-weight:700;">TOTAL</td>';
+  months.forEach(m => {
+    const c = totals[m].created;
+    const f = totals[m].closed;
+    const saldo = f - c;
+    const sStyle = saldo !== 0 ? hmCellColor(saldo, true) : '';
+    html += '<td class="hm-cell" style="font-weight:700;">' + c + '</td>';
+    html += '<td class="hm-cell" style="font-weight:700;">' + f + '</td>';
+    html += '<td class="hm-cell" style="font-weight:700;' + sStyle + '">' + saldo + '</td>';
+  });
+  html += '</tr></tbody>';
+
+  document.getElementById('heatmap-table').innerHTML = html;
 }
 
 // ============================================================
