@@ -572,11 +572,7 @@
         </div>
         <div class="filter-group">
           <label>De</label>
-          <input type="month" id="filas-from" value="2025-01" onchange="renderFilasHeatmap()">
-        </div>
-        <div class="filter-group">
-          <label>Até</label>
-          <input type="month" id="filas-to" onchange="renderFilasHeatmap()">
+          <input type="month" id="filas-from" value="2026-01" onchange="renderFilasHeatmap()">
         </div>
       </div>
       <div style="overflow-x:auto;">
@@ -1502,12 +1498,10 @@ function setFilasView(v) {
 function renderFilasHeatmap() {
   const now = new Date();
   const fromVal = document.getElementById('filas-from').value;
-  const toVal = document.getElementById('filas-to').value || now.toISOString().substring(0, 7);
 
-  // Range: início do mês "De" até fim do mês "Até"
+  // Range: início do mês "De" até hoje
   const fromDate = new Date(fromVal + '-01');
-  const toDate = new Date(toVal + '-01');
-  toDate.setMonth(toDate.getMonth() + 1);
+  const toDate = now;
 
   let buckets = [];
 
@@ -1971,7 +1965,6 @@ function closeModal() {
 const now = new Date();
 document.getElementById('header-date').textContent = 'Atualizado a cada hora · ' + (typeof JIRA_DATA_DATE === 'string' ? 'Última: ' + JIRA_DATA_DATE + ' · ' : '') + RAW_DATA.length + ' tickets';
 document.getElementById('filter-to').value = now.toISOString().substring(0, 7);
-document.getElementById('filas-to').value = now.toISOString().substring(0, 7);
 
 loadData();
 </script>
