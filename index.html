@@ -1,4 +1,4 @@
-eu <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -247,7 +247,7 @@ eu <!DOCTYPE html>
   }
   .modal-box {
     background: var(--card); border-radius: 12px; padding: 1.5rem;
-    max-width: 900px; width: 95%; max-height: 80vh; overflow-y: auto;
+    max-width: 1200px; width: 95%; max-height: 80vh; overflow-y: auto;
     box-shadow: 0 8px 32px rgba(0,0,0,.15);
   }
   .modal-box h3 { font-size: 1rem; margin-bottom: 1rem; }
@@ -542,7 +542,7 @@ eu <!DOCTYPE html>
     <button class="close-btn" onclick="closeModal()">✕</button>
     <h3 id="modal-title">Tickets Abertos</h3>
     <table>
-      <thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority CX</th><th>Segmentação</th><th>Aging</th></tr></thead>
+      <thead id="modal-thead"><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority CX</th><th>Segmentação</th><th>Aging</th></tr></thead>
       <tbody id="modal-body"></tbody>
     </table>
   </div>
@@ -1556,7 +1556,6 @@ function renderHeatmap() {
 function showHeatmapTickets(year, month, day, type) {
   const puFilter = document.getElementById('hm-pu').value;
   const prodFilter = document.getElementById('hm-produto').value;
-  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   let tickets;
   let title;
@@ -1585,6 +1584,14 @@ function showHeatmapTickets(year, month, day, type) {
 
   tickets.sort((a, b) => new Date(a.created) - new Date(b.created));
 
+  // Atualizar thead conforme tipo
+  const thead = document.getElementById('modal-thead');
+  if (type === 'resolved') {
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
+  } else {
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Priority CX</th><th>Segmentação</th><th>Aging</th></tr>';
+  }
+
   document.getElementById('modal-title').textContent = title;
   const tbody = document.getElementById('modal-body');
   tbody.innerHTML = '';
@@ -1594,14 +1601,25 @@ function showHeatmapTickets(year, month, day, type) {
     const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
     const jiraUrl = 'https://hotmart.atlassian.net/browse/' + t.key;
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
-      <td>${(t.summary || '').substring(0, 80)}</td>
-      <td>${t.status}</td>
-      <td>${t.priorityCX || t.priority || '—'}</td>
-      <td>${t.segmentacao || '—'}</td>
-      <td><span class="badge ${agingClass}">${aging}</span></td>
-    `;
+    if (type === 'resolved') {
+      tr.innerHTML = `
+        <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
+        <td>${(t.summary || '').substring(0, 100)}</td>
+        <td>${t._produto || '—'}</td>
+        <td>${t.assignee || t.partner || '—'}</td>
+        <td>${t.priorityCX || t.priority || '—'}</td>
+        <td><span class="badge ${agingClass}">${aging}</span></td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
+        <td>${(t.summary || '').substring(0, 100)}</td>
+        <td>${t._produto || '—'}</td>
+        <td>${t.priorityCX || t.priority || '—'}</td>
+        <td>${t.segmentacao || '—'}</td>
+        <td><span class="badge ${agingClass}">${aging}</span></td>
+      `;
+    }
     tbody.appendChild(tr);
   });
 
