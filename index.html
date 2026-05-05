@@ -238,6 +238,7 @@ eu <!DOCTYPE html>
   .heatmap-filters { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
   .heatmap-filters label { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
   .heatmap-filters select { padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; font-size: .8rem; background: var(--card); }
+  .hm-clickable:hover { outline: 2px solid var(--accent); outline-offset: -2px; filter: brightness(0.92); }
 
   /* Modal */
   .modal-overlay {
@@ -1523,9 +1524,13 @@ function renderHeatmap() {
       const fStyle = f > 0 ? hmCellColor(f, false) : '';
       const sStyle = saldo !== 0 ? hmCellColor(saldo, true) : '';
 
-      html += '<td class="hm-cell" style="' + cStyle + '">' + (c || '') + '</td>';
-      html += '<td class="hm-cell" style="' + fStyle + '">' + (f || '') + '</td>';
-      html += '<td class="hm-cell" style="' + sStyle + '">' + (saldo !== 0 ? saldo : '') + '</td>';
+      const cClick = c > 0 ? ' class="hm-cell hm-clickable" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'created\')" style="cursor:pointer;' + cStyle + '"' : ' class="hm-cell" style="' + cStyle + '"';
+      const fClick = f > 0 ? ' class="hm-cell hm-clickable" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'resolved\')" style="cursor:pointer;' + fStyle + '"' : ' class="hm-cell" style="' + fStyle + '"';
+      const sClick = saldo !== 0 ? ' class="hm-cell hm-clickable" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'' + (saldo > 0 ? 'resolved' : 'created') + '\')" style="cursor:pointer;' + sStyle + '"' : ' class="hm-cell" style="' + sStyle + '"';
+
+      html += '<td' + cClick + '>' + (c || '') + '</td>';
+      html += '<td' + fClick + '>' + (f || '') + '</td>';
+      html += '<td' + sClick + '>' + (saldo !== 0 ? saldo : '') + '</td>';
     });
     html += '</tr>';
   }
@@ -1543,6 +1548,64 @@ function renderHeatmap() {
   html += '</tr></tbody>';
 
   document.getElementById('heatmap-table').innerHTML = html;
+}
+
+// ============================================================
+// HEATMAP — Modal de tickets por dia
+// ============================================================
+function showHeatmapTickets(year, month, day, type) {
+  const puFilter = document.getElementById('hm-pu').value;
+  const prodFilter = document.getElementById('hm-produto').value;
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  let tickets;
+  let title;
+  const dayStr = String(day).padStart(2,'0') + '/' + String(month+1).padStart(2,'0') + '/' + year;
+
+  if (type === 'created') {
+    tickets = RAW_DATA.filter(t => {
+      const d = new Date(t.created);
+      if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return false;
+      if (puFilter !== 'all' && t._pu !== puFilter) return false;
+      if (prodFilter !== 'all' && t._produto !== prodFilter) return false;
+      return true;
+    });
+    title = 'Tickets Criados em ' + dayStr + ' (' + tickets.length + ')';
+  } else {
+    tickets = RAW_DATA.filter(t => {
+      if (!t.resolutiondate) return false;
+      const d = new Date(t.resolutiondate);
+      if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return false;
+      if (puFilter !== 'all' && t._pu !== puFilter) return false;
+      if (prodFilter !== 'all' && t._produto !== prodFilter) return false;
+      return true;
+    });
+    title = 'Tickets Fechados em ' + dayStr + ' (' + tickets.length + ')';
+  }
+
+  tickets.sort((a, b) => new Date(a.created) - new Date(b.created));
+
+  document.getElementById('modal-title').textContent = title;
+  const tbody = document.getElementById('modal-body');
+  tbody.innerHTML = '';
+
+  tickets.forEach(t => {
+    const aging = calcAging(t.created);
+    const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
+    const jiraUrl = 'https://hotmart.atlassian.net/browse/' + t.key;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
+      <td>${(t.summary || '').substring(0, 80)}</td>
+      <td>${t.status}</td>
+      <td>${t.priorityCX || t.priority || '—'}</td>
+      <td>${t.segmentacao || '—'}</td>
+      <td><span class="badge ${agingClass}">${aging}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('modal-open').style.display = 'flex';
 }
 
 // ============================================================
