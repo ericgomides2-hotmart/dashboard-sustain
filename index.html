@@ -1550,11 +1550,14 @@ function renderFilasHeatmap() {
     const openCount = squadCounts[squad];
 
     // "Ant." = quantos tickets estavam abertos no início do período visível para este squad
-    // = criados ANTES de firstBucketStart E (não resolvidos OU resolvidos >= firstBucketStart)
+    // = criados ANTES de firstBucketStart E status != Done E (não resolvidos OU resolvidos >= firstBucketStart)
+    const isDone = s => ['Done','Concluído','Cancelado','canceled','cancelled'].includes(s);
     const anterior = RAW_DATA.filter(t => {
       if (deriveSquad(t) !== squad) return false;
       const c = new Date(t.created);
       if (c >= firstBucketStart) return false;
+      // Se já estava Done/Cancelado sem resolutiondate, não conta como aberto
+      if (isDone(t.status) && !t.resolutiondate) return false;
       if (t.resolutiondate && new Date(t.resolutiondate) < firstBucketStart) return false;
       return true;
     }).length;
