@@ -55,6 +55,7 @@ JQL = (
 
 FIELDS = ",".join([
     "key", "summary", "status", "priority", "created", "resolutiondate", "labels",
+    "assignee",
     CF_CAMADA_SERVICO, CF_PRODUTO_FRENTE, CF_PRIORITY_CX,
     CF_SEGMENTACAO_CX, CF_PARTNER, CF_JIRA_PROJECT_KEY, CF_JIRA_PROJECT
 ])
@@ -105,6 +106,7 @@ def fetch_all_issues():
                 "created": f.get("created", ""),
                 "resolutiondate": f.get("resolutiondate"),
                 "labels": f.get("labels", []),
+                "assignee": (f.get("assignee") or {}).get("displayName", "") if isinstance(f.get("assignee"), dict) else "",
                 "produtoFrente": f.get(CF_PRODUTO_FRENTE, "") or "",
                 "camadaServico": camadaPai,
                 "camadaServicoFilho": camadaFilho,
