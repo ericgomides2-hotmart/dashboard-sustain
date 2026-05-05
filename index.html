@@ -412,11 +412,11 @@
   <!-- CHARTS ROW 1 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📈</span> Volumetria — Criados vs Resolvidos<button class="btn-expand" onclick="expandChart('chart-volume','Volumetria — Criados vs Resolvidos')">⛶</button></div>
+      <div class="chart-title">Volumetria — Criados vs Resolvidos<button class="btn-expand" onclick="expandChart('chart-volume','Volumetria — Criados vs Resolvidos')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-volume"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">⏱️</span> Volumetria por Produto + SLA<button class="btn-expand" onclick="expandChart('chart-sla','Volumetria por Produto + SLA')">⛶</button></div>
+      <div class="chart-title">Volumetria por Produto + SLA<button class="btn-expand" onclick="expandChart('chart-sla','Volumetria por Produto + SLA')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-sla"></canvas></div>
     </div>
   </div>
@@ -424,11 +424,11 @@
   <!-- CHARTS ROW 2 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">🔀</span> % Transbordo por Período<button class="btn-expand" onclick="expandChart('chart-transbordo','% Transbordo por Período')">⛶</button></div>
+      <div class="chart-title">% Transbordo por Período<button class="btn-expand" onclick="expandChart('chart-transbordo','% Transbordo por Período')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-transbordo"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📈</span> Segmentação CX por Período<button class="btn-expand" onclick="expandChart('chart-seg-time','Segmentação CX por Período')">⛶</button></div>
+      <div class="chart-title">Segmentação CX por Período<button class="btn-expand" onclick="expandChart('chart-seg-time','Segmentação CX por Período')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-seg-time"></canvas></div>
     </div>
   </div>
@@ -436,18 +436,18 @@
   <!-- CHARTS ROW 3 -->
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">📊</span> Aging — Distribuição por Produto<button class="btn-expand" onclick="expandChart('chart-aging','Aging — Distribuição por Produto')">⛶</button></div>
+      <div class="chart-title">Aging — Distribuição por Produto<button class="btn-expand" onclick="expandChart('chart-aging','Aging — Distribuição por Produto')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-aging"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><span class="icon">🏷️</span> Distribuição por PU<button class="btn-expand" onclick="expandChart('chart-pu','Distribuição por PU')">⛶</button></div>
+      <div class="chart-title">Distribuição por PU<button class="btn-expand" onclick="expandChart('chart-pu','Distribuição por PU')">⛶</button></div>
       <div class="chart-container"><canvas id="chart-pu"></canvas></div>
     </div>
   </div>
 
   <!-- TABLE: Detalhamento por Produto -->
   <div class="table-card">
-    <div class="chart-title"><span class="icon">📋</span> Detalhamento por Produto</div>
+    <div class="chart-title">Detalhamento por Produto</div>
     <table>
       <thead>
         <tr>
@@ -506,24 +506,24 @@
 
     <!-- IQP by PU — period columns -->
     <div class="table-card" style="overflow-x:auto;">
-      <div class="chart-title"><span class="icon">🏆</span> IQP por PU</div>
+      <div class="chart-title">IQP por PU</div>
       <table><thead id="iqp-pu-thead"></thead><tbody id="iqp-table-pu"></tbody></table>
     </div>
 
     <!-- IQP by Produto — period columns -->
     <div class="table-card" style="overflow-x:auto;">
-      <div class="chart-title"><span class="icon">📊</span> IQP por Produto</div>
+      <div class="chart-title">IQP por Produto</div>
       <table><thead id="iqp-prod-thead"></thead><tbody id="iqp-table-produto"></tbody></table>
     </div>
 
     <!-- IQP Charts -->
     <div class="charts-grid">
       <div class="chart-card">
-        <div class="chart-title"><span class="icon">📈</span> IQP por Período — PUs<button class="btn-expand" onclick="expandChart('chart-iqp-pu','IQP por Período — PUs')">⛶</button></div>
+        <div class="chart-title">IQP por Período — PUs<button class="btn-expand" onclick="expandChart('chart-iqp-pu','IQP por Período — PUs')">⛶</button></div>
         <div class="chart-container"><canvas id="chart-iqp-pu"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title"><span class="icon">📈</span> IQP por Período — Top 10 Produtos (piores)<button class="btn-expand" onclick="expandChart('chart-iqp-produto','IQP por Período — Top 10 Produtos')">⛶</button></div>
+        <div class="chart-title">IQP por Período — Top 10 Produtos (piores)<button class="btn-expand" onclick="expandChart('chart-iqp-produto','IQP por Período — Top 10 Produtos')">⛶</button></div>
         <div class="chart-container"><canvas id="chart-iqp-produto"></canvas></div>
       </div>
     </div>
@@ -533,7 +533,7 @@
   <!-- TAB: VISÃO ERIC -->
   <div class="tab-content" id="tab-eric">
     <div class="chart-card" style="padding:1.5rem;">
-      <div class="chart-title"><span class="icon">🔥</span> Heatmap Diário — Criados vs Fechados vs Saldo</div>
+      <div class="chart-title">Heatmap Diário — Criados vs Fechados vs Saldo</div>
       <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Visualização dia-a-dia para identificar se estamos ganhando ou perdendo o jogo. Verde = saldo positivo (fechando mais). Vermelho = saldo negativo (acumulando).</p>
       <div class="heatmap-filters">
         <label>Ano</label>
@@ -557,18 +557,26 @@
     </div>
   </div><!-- end tab-eric -->
 
-  <!-- TAB: VISÃO FILA -->
+  <!-- TAB: FILA -->
   <div class="tab-content" id="tab-filas">
     <div class="chart-card" style="padding:1.5rem;">
-      <div class="chart-title"><span class="icon">&#128293;</span> Heatmap por Fila (Squad)</div>
+      <div class="chart-title">Heatmap por Fila (Squad)</div>
       <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Linhas = squads/filas. Verde = fechando mais, vermelho = acumulando. "Saldo Ant." = tickets abertos antes do período visível.</p>
       <div class="filters" style="margin-bottom:1rem;">
         <div class="filter-group">
-          <label>Período</label>
+          <label>Visão</label>
           <div class="toggle-group">
             <button class="toggle-btn active" data-filasview="wow" onclick="setFilasView('wow')">Semanal</button>
             <button class="toggle-btn" data-filasview="mom" onclick="setFilasView('mom')">Mensal</button>
           </div>
+        </div>
+        <div class="filter-group">
+          <label>De</label>
+          <input type="month" id="filas-from" value="2025-01" onchange="renderFilasHeatmap()">
+        </div>
+        <div class="filter-group">
+          <label>Até</label>
+          <input type="month" id="filas-to" onchange="renderFilasHeatmap()">
         </div>
       </div>
       <div style="overflow-x:auto;">
@@ -1493,28 +1501,51 @@ function setFilasView(v) {
 
 function renderFilasHeatmap() {
   const now = new Date();
+  const fromVal = document.getElementById('filas-from').value;
+  const toVal = document.getElementById('filas-to').value || now.toISOString().substring(0, 7);
+
+  // Definir range de datas baseado nos filtros
+  const fromDate = new Date(fromVal + '-01');
+  const toDate = new Date(toVal + '-01');
+  toDate.setMonth(toDate.getMonth() + 1); // fim do mês selecionado
+
   let buckets = [];
 
   if (filasView === 'wow') {
-    // Últimas 10 semanas
-    for (let i = 9; i >= 0; i--) {
-      const start = new Date(now.getTime() - (i * 7 + 6) * 86400000);
-      const end = new Date(now.getTime() - i * 7 * 86400000);
-      buckets.push({ start, end, label: String(start.getDate()).padStart(2,'0') + '/' + String(start.getMonth()+1).padStart(2,'0') });
+    // Semanas dentro do range
+    let cursor = new Date(fromDate);
+    // Alinhar ao início da semana (segunda)
+    const day = cursor.getDay() || 7;
+    cursor.setDate(cursor.getDate() - day + 1);
+    while (cursor < toDate) {
+      const start = new Date(cursor);
+      const end = new Date(cursor.getTime() + 7 * 86400000);
+      if (end > fromDate) {
+        buckets.push({ start, end: end > toDate ? toDate : end, label: String(start.getDate()).padStart(2,'0') + '/' + String(start.getMonth()+1).padStart(2,'0') });
+      }
+      cursor = new Date(cursor.getTime() + 7 * 86400000);
     }
   } else {
-    // Últimos 6 meses
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-      const label = String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-      buckets.push({ start: d, end, label });
+    // Meses dentro do range
+    let cursor = new Date(fromDate);
+    while (cursor < toDate) {
+      const start = new Date(cursor);
+      const end = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      const label = String(start.getMonth()+1).padStart(2,'0') + '/' + start.getFullYear();
+      buckets.push({ start, end: end > toDate ? toDate : end, label });
+      cursor = end;
     }
   }
 
-  const firstBucketStart = buckets[0].start;
+  if (buckets.length === 0) {
+    document.getElementById('filas-heatmap').innerHTML = '<tr><td style="padding:2rem;color:var(--muted);">Sem dados para o período.</td></tr>';
+    return;
+  }
 
-  // Tickets abertos agrupados por squad (partner)
+  const firstBucketStart = buckets[0].start;
+  const lastBucketEnd = buckets[buckets.length - 1].end;
+
+  // Tickets abertos AGORA agrupados por squad
   const openTickets = RAW_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
   const squadCounts = {};
   openTickets.forEach(t => {
@@ -1532,13 +1563,12 @@ function renderFilasHeatmap() {
   squads.forEach(squad => {
     const openCount = squadCounts[squad];
 
-    // Saldo anterior: tickets criados antes do período visível que ainda não foram resolvidos antes do período
-    // = tickets criados antes de firstBucketStart que NÃO foram resolvidos antes de firstBucketStart
+    // Saldo anterior = tickets que estavam abertos no início do período visível
+    // = criados ANTES de firstBucketStart E (não resolvidos OU resolvidos DEPOIS de firstBucketStart)
     const saldoAnterior = RAW_DATA.filter(t => {
       if (deriveSquad(t) !== squad) return false;
       const created = new Date(t.created);
-      if (created >= firstBucketStart) return false; // criado dentro do período
-      // Se foi resolvido antes do período, não conta
+      if (created >= firstBucketStart) return false;
       if (t.resolutiondate && new Date(t.resolutiondate) < firstBucketStart) return false;
       return true;
     }).length;
@@ -1945,6 +1975,7 @@ function closeModal() {
 const now = new Date();
 document.getElementById('header-date').textContent = 'Atualizado a cada hora · ' + (typeof JIRA_DATA_DATE === 'string' ? 'Última: ' + JIRA_DATA_DATE + ' · ' : '') + RAW_DATA.length + ' tickets';
 document.getElementById('filter-to').value = now.toISOString().substring(0, 7);
+document.getElementById('filas-to').value = now.toISOString().substring(0, 7);
 
 loadData();
 </script>
