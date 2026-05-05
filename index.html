@@ -238,7 +238,8 @@
   .heatmap-filters { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
   .heatmap-filters label { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
   .heatmap-filters select { padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; font-size: .8rem; background: var(--card); }
-  .hm-clickable:hover { outline: 2px solid var(--accent); outline-offset: -2px; filter: brightness(0.92); }
+  .hm-link { color: var(--accent); text-decoration: underline; font-weight: 600; cursor: pointer; }
+  .hm-link:hover { color: #d4421d; }
 
   /* Modal */
   .modal-overlay {
@@ -1524,13 +1525,17 @@ function renderHeatmap() {
       const fStyle = f > 0 ? hmCellColor(f, false) : '';
       const sStyle = saldo !== 0 ? hmCellColor(saldo, true) : '';
 
-      const cClick = c > 0 ? ' class="hm-cell hm-clickable" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'created\')" style="cursor:pointer;' + cStyle + '"' : ' class="hm-cell" style="' + cStyle + '"';
-      const fClick = f > 0 ? ' class="hm-cell hm-clickable" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'resolved\')" style="cursor:pointer;' + fStyle + '"' : ' class="hm-cell" style="' + fStyle + '"';
-      const sClick = saldo !== 0 ? ' class="hm-cell hm-clickable" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'' + (saldo > 0 ? 'resolved' : 'created') + '\')" style="cursor:pointer;' + sStyle + '"' : ' class="hm-cell" style="' + sStyle + '"';
+      const cClick = c > 0 ? ' class="hm-cell" style="' + cStyle + '"' : ' class="hm-cell" style="' + cStyle + '"';
+      const fClick = f > 0 ? ' class="hm-cell" style="' + fStyle + '"' : ' class="hm-cell" style="' + fStyle + '"';
+      const sClick = ' class="hm-cell" style="' + sStyle + '"';
 
-      html += '<td' + cClick + '>' + (c || '') + '</td>';
-      html += '<td' + fClick + '>' + (f || '') + '</td>';
-      html += '<td' + sClick + '>' + (saldo !== 0 ? saldo : '') + '</td>';
+      const cVal = c > 0 ? '<a class="hm-link" href="javascript:void(0)" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'created\')">' + c + '</a>' : '';
+      const fVal = f > 0 ? '<a class="hm-link" href="javascript:void(0)" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'resolved\')">' + f + '</a>' : '';
+      const sVal = saldo !== 0 ? '<a class="hm-link" href="javascript:void(0)" onclick="showHeatmapTickets(' + year + ',' + m + ',' + day + ',\'saldo\')">' + saldo + '</a>' : '';
+
+      html += '<td' + cClick + '>' + cVal + '</td>';
+      html += '<td' + fClick + '>' + fVal + '</td>';
+      html += '<td' + sClick + '>' + sVal + '</td>';
     });
     html += '</tr>';
   }
@@ -1570,7 +1575,7 @@ function showHeatmapTickets(year, month, day, type) {
       return true;
     });
     title = 'Tickets Criados em ' + dayStr + ' (' + tickets.length + ')';
-  } else {
+  } else if (type === 'resolved') {
     tickets = RAW_DATA.filter(t => {
       if (!t.resolutiondate) return false;
       const d = new Date(t.resolutiondate);
@@ -1580,6 +1585,26 @@ function showHeatmapTickets(year, month, day, type) {
       return true;
     });
     title = 'Tickets Fechados em ' + dayStr + ' (' + tickets.length + ')';
+  } else {
+    // saldo: mostra criados e fechados juntos
+    const created = RAW_DATA.filter(t => {
+      const d = new Date(t.created);
+      if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return false;
+      if (puFilter !== 'all' && t._pu !== puFilter) return false;
+      if (prodFilter !== 'all' && t._produto !== prodFilter) return false;
+      return true;
+    });
+    const resolved = RAW_DATA.filter(t => {
+      if (!t.resolutiondate) return false;
+      const d = new Date(t.resolutiondate);
+      if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return false;
+      if (puFilter !== 'all' && t._pu !== puFilter) return false;
+      if (prodFilter !== 'all' && t._produto !== prodFilter) return false;
+      return true;
+    });
+    const saldo = resolved.length - created.length;
+    title = 'Saldo ' + dayStr + ': ' + (saldo > 0 ? '+' : '') + saldo + ' (Criados: ' + created.length + ' / Fechados: ' + resolved.length + ')';
+    tickets = created.map(t => ({...t, _hmType: 'criado'})).concat(resolved.map(t => ({...t, _hmType: 'fechado'})));
   }
 
   tickets.sort((a, b) => new Date(a.created) - new Date(b.created));
@@ -1588,8 +1613,10 @@ function showHeatmapTickets(year, month, day, type) {
   const thead = document.getElementById('modal-thead');
   if (type === 'resolved') {
     thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Responsável</th><th>Priority CX</th><th>Aging</th></tr>';
+  } else if (type === 'saldo') {
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Tipo</th><th>Produto</th><th>Status</th><th>Responsável</th></tr>';
   } else {
-    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Priority CX</th><th>Segmentação</th><th>Aging</th></tr>';
+    thead.innerHTML = '<tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Priority CX</th></tr>';
   }
 
   document.getElementById('modal-title').textContent = title;
@@ -1597,11 +1624,11 @@ function showHeatmapTickets(year, month, day, type) {
   tbody.innerHTML = '';
 
   tickets.forEach(t => {
-    const aging = calcAging(t.created);
-    const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
     const jiraUrl = 'https://hotmart.atlassian.net/browse/' + t.key;
     const tr = document.createElement('tr');
     if (type === 'resolved') {
+      const aging = calcAging(t.created);
+      const agingClass = aging === '>30d' ? 'badge-red' : aging === '5-30d' ? 'badge-yellow' : 'badge-green';
       tr.innerHTML = `
         <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
         <td>${(t.summary || '').substring(0, 100)}</td>
@@ -1610,14 +1637,24 @@ function showHeatmapTickets(year, month, day, type) {
         <td>${t.priorityCX || t.priority || '—'}</td>
         <td><span class="badge ${agingClass}">${aging}</span></td>
       `;
+    } else if (type === 'saldo') {
+      const tipoBadge = t._hmType === 'criado' ? '<span class="badge badge-red">Criado</span>' : '<span class="badge badge-green">Fechado</span>';
+      tr.innerHTML = `
+        <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
+        <td>${(t.summary || '').substring(0, 100)}</td>
+        <td>${tipoBadge}</td>
+        <td>${t._produto || '—'}</td>
+        <td>${t.status || '—'}</td>
+        <td>${t.assignee || t.partner || '—'}</td>
+      `;
     } else {
       tr.innerHTML = `
         <td><a href="${jiraUrl}" target="_blank">${t.key}</a></td>
         <td>${(t.summary || '').substring(0, 100)}</td>
         <td>${t._produto || '—'}</td>
+        <td>${t.status || '—'}</td>
+        <td>${t.assignee || t.partner || '—'}</td>
         <td>${t.priorityCX || t.priority || '—'}</td>
-        <td>${t.segmentacao || '—'}</td>
-        <td><span class="badge ${agingClass}">${aging}</span></td>
       `;
     }
     tbody.appendChild(tr);
