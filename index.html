@@ -1504,29 +1504,29 @@ function renderFilasHeatmap() {
   const fromVal = document.getElementById('filas-from').value;
   const toVal = document.getElementById('filas-to').value || now.toISOString().substring(0, 7);
 
-  // Definir range de datas baseado nos filtros
+  // Range: início do mês "De" até fim do mês "Até"
   const fromDate = new Date(fromVal + '-01');
   const toDate = new Date(toVal + '-01');
-  toDate.setMonth(toDate.getMonth() + 1); // fim do mês selecionado
+  toDate.setMonth(toDate.getMonth() + 1);
 
   let buckets = [];
 
   if (filasView === 'wow') {
     // Semanas dentro do range
     let cursor = new Date(fromDate);
-    // Alinhar ao início da semana (segunda)
     const day = cursor.getDay() || 7;
     cursor.setDate(cursor.getDate() - day + 1);
     while (cursor < toDate) {
       const start = new Date(cursor);
       const end = new Date(cursor.getTime() + 7 * 86400000);
       if (end > fromDate) {
-        buckets.push({ start, end: end > toDate ? toDate : end, label: String(start.getDate()).padStart(2,'0') + '/' + String(start.getMonth()+1).padStart(2,'0') });
+        const effStart = start < fromDate ? fromDate : start;
+        const effEnd = end > toDate ? toDate : end;
+        buckets.push({ start: effStart, end: effEnd, label: String(effStart.getDate()).padStart(2,'0') + '/' + String(effStart.getMonth()+1).padStart(2,'0') });
       }
       cursor = new Date(cursor.getTime() + 7 * 86400000);
     }
   } else {
-    // Meses dentro do range
     let cursor = new Date(fromDate);
     while (cursor < toDate) {
       const start = new Date(cursor);
@@ -1543,41 +1543,36 @@ function renderFilasHeatmap() {
   }
 
   const firstBucketStart = buckets[0].start;
-  const lastBucketEnd = buckets[buckets.length - 1].end;
 
-  // Tickets abertos AGORA agrupados por squad
+  // Tickets abertos AGORA
   const openTickets = RAW_DATA.filter(t => !['Done','Concluído','Cancelado','canceled','cancelled'].includes(t.status));
   const squadCounts = {};
-  openTickets.forEach(t => {
-    const squad = deriveSquad(t);
-    squadCounts[squad] = (squadCounts[squad] || 0) + 1;
-  });
-
-  // Ordenar squads por quantidade de abertos (desc)
+  openTickets.forEach(t => { const sq = deriveSquad(t); squadCounts[sq] = (squadCounts[sq] || 0) + 1; });
   const squads = Object.keys(squadCounts).sort((a, b) => squadCounts[b] - squadCounts[a]);
 
-  let html = '<thead><tr><th style="position:sticky;left:0;z-index:3;">Fila (Squad)</th><th class="hm-cell" style="font-weight:700;">Abertos</th><th class="hm-cell">Saldo Ant.</th>';
+  let html = '<thead><tr><th style="position:sticky;left:0;z-index:3;">Fila (Squad)</th><th class="hm-cell" style="font-weight:700;">Abertos</th><th class="hm-cell">Ant.</th>';
   buckets.forEach(b => { html += '<th class="hm-cell">' + b.label + '</th>'; });
   html += '</tr></thead><tbody>';
 
   squads.forEach(squad => {
     const openCount = squadCounts[squad];
 
-    // Saldo anterior = tickets que estavam abertos no início do período visível
-    // = criados ANTES de firstBucketStart E (não resolvidos OU resolvidos DEPOIS de firstBucketStart)
-    const saldoAnterior = RAW_DATA.filter(t => {
+    // "Ant." = quantos tickets estavam abertos no início do período visível para este squad
+    // = criados ANTES de firstBucketStart E (não resolvidos OU resolvidos >= firstBucketStart)
+    const anterior = RAW_DATA.filter(t => {
       if (deriveSquad(t) !== squad) return false;
-      const created = new Date(t.created);
-      if (created >= firstBucketStart) return false;
+      const c = new Date(t.created);
+      if (c >= firstBucketStart) return false;
       if (t.resolutiondate && new Date(t.resolutiondate) < firstBucketStart) return false;
       return true;
     }).length;
 
     html += '<tr><td class="day-col" style="text-align:left;font-size:.72rem;min-width:160px;"><a class="hm-link" href="javascript:void(0)" onclick="showFilaTickets(\'' + squad.replace(/'/g, "\\'") + '\')">' + squad + '</a></td>';
     html += '<td class="hm-cell" style="font-weight:700;background:var(--red-light);color:var(--red);">' + openCount + '</td>';
-    html += '<td class="hm-cell" style="font-weight:600;color:var(--muted);">' + saldoAnterior + '</td>';
+    html += '<td class="hm-cell" style="font-weight:600;color:var(--muted);">' + anterior + '</td>';
 
     buckets.forEach(b => {
+      // Saldo = criados - fechados neste período (positivo = acumulou, negativo = reduziu)
       const created = RAW_DATA.filter(t => {
         if (deriveSquad(t) !== squad) return false;
         const d = new Date(t.created);
@@ -1589,10 +1584,11 @@ function renderFilasHeatmap() {
         const d = new Date(t.resolutiondate);
         return d >= b.start && d < b.end;
       }).length;
-      const saldo = resolved - created;
+      // criados - fechados: positivo = fila cresceu (vermelho), negativo = fila diminuiu (verde)
+      const saldo = created - resolved;
       let style = '';
-      if (saldo > 0) { const i = Math.min(saldo / 15, 1); style = 'background:rgba(16,185,129,' + (0.15 + i * 0.5) + ');color:#065f46;'; }
-      else if (saldo < 0) { const i = Math.min(Math.abs(saldo) / 15, 1); style = 'background:rgba(239,68,68,' + (0.15 + i * 0.5) + ');color:#7f1d1d;'; }
+      if (saldo < 0) { const i = Math.min(Math.abs(saldo) / 15, 1); style = 'background:rgba(16,185,129,' + (0.15 + i * 0.5) + ');color:#065f46;'; }
+      else if (saldo > 0) { const i = Math.min(saldo / 15, 1); style = 'background:rgba(239,68,68,' + (0.15 + i * 0.5) + ');color:#7f1d1d;'; }
       html += '<td class="hm-cell" style="' + style + '">' + (saldo !== 0 ? saldo : '') + '</td>';
     });
     html += '</tr>';
