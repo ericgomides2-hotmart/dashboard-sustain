@@ -276,9 +276,11 @@
   }
   .modal-box h3 { font-size: 1rem; margin-bottom: 1rem; }
   .modal-box .close-btn {
-    float: right; background: none; border: none; font-size: 1.2rem;
-    cursor: pointer; color: var(--muted); padding: 0 .3rem;
+    float: right; background: var(--bg); border: 1px solid var(--border); font-size: .85rem;
+    cursor: pointer; color: var(--muted); padding: .4rem .7rem; border-radius: 8px;
+    font-weight: 600; transition: all .15s; line-height: 1;
   }
+  .modal-box .close-btn:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
   .modal-box table { width: 100%; border-collapse: collapse; }
   .modal-box th { text-align: left; font-size: .7rem; text-transform: uppercase; color: var(--muted); padding: .5rem; border-bottom: 2px solid var(--border); }
   .modal-box td { padding: .5rem; border-bottom: 1px solid var(--border); font-size: .8rem; }
@@ -565,7 +567,7 @@
   <div class="chart-modal-box">
     <div class="chart-modal-header">
       <h3 id="chart-modal-title"></h3>
-      <button class="close-btn" onclick="closeChartModal()">✕</button>
+      <button class="close-btn" onclick="closeChartModal()">Fechar</button>
     </div>
     <div class="chart-modal-canvas"><canvas id="chart-modal-canvas"></canvas></div>
   </div>
@@ -574,7 +576,7 @@
 <!-- MODAL for open tickets -->
 <div class="modal-overlay" id="modal-open" style="display:none;" onclick="if(event.target===this)closeModal()">
   <div class="modal-box">
-    <button class="close-btn" onclick="closeModal()">✕</button>
+    <button class="close-btn" onclick="closeModal()">Fechar</button>
     <h3 id="modal-title">Tickets Abertos</h3>
     <table>
       <thead id="modal-thead"><tr><th>Key</th><th>Summary</th><th>Produto</th><th>Status</th><th>Responsável</th><th>Seg. CX</th><th>Priority CX</th><th>Aging</th></tr></thead>
